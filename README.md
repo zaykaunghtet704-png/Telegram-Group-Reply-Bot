@@ -53,6 +53,9 @@ Traditional Telegram group keyword auto-reply bot. This is **not an AI chatbot**
 - `/antilink on|off` — delete messages containing common links (requires delete-message permission)
 - `/antispam on|off` — delete repeated identical messages
 - `/setraidlimit 2-20` — alert owner after this many member removals/admin demotions by one actor within 60 seconds
+- `/addfilterword phrase` — add a group phrase to the deletion filter
+- `/listfilterwords` — list blocked phrases
+- `/delfilterword ID` — remove a blocked phrase
 - `/learn on|off` — toggle conversation learning
 - `/learned` — list learned conversation pairs
 - `/forgetlearned ID` — delete a learned pair
@@ -80,7 +83,7 @@ Render provides `PORT` and `RENDER_EXTERNAL_URL` to a Web Service. The app uses 
 4. Promote the bot to group admin and grant Delete Messages, Ban Users, and Manage Chat permissions as needed. Use a group administrator account to run `/panel` or add reply rules.\n5. Set `OWNER_ID` in Render and start a private chat with the bot using `/start`, so anti-nuke alerts can reach the owner.
 5. To receive automatic backups, set `OWNER_ID` in Render and start a private chat with the bot using `/start`.
 
-## Security limitations\n- Telegram does not provide bots with users’ personal profile bio text, so the bot cannot scan or delete a member’s private Bio. It can moderate links and repeated text posted as group messages.\n- Telegram does not provide a general feed of messages deleted by other admins, nor a reliable event for every group description/profile change.\n- Anti-nuke monitoring uses Telegram chat-member updates. The bot must be a group admin and must receive chat-member updates. It detects repeated removals/admin demotions; it cannot undo an action before Telegram reports it.\n- The owner decision button is only sent when `OWNER_ID` is configured and the owner has opened the bot privately. If the suspected actor is still a group admin, Telegram may prevent the bot from banning them; the group creator may need to demote them first.\n- These protections are OFF by default. Enable `/security on`, then `/antilink on` and/or `/antispam on` per group.\n\n## Important storage note
+## Security limitations\n- Telegram does not provide bots with users’ personal profile bio text, so the bot cannot scan or delete a member’s private Bio. It can moderate links and repeated text posted as group messages.\n- Telegram does not provide a general feed of messages deleted by other admins, nor a reliable event for every group description/profile change.\n- Anti-nuke monitoring uses Telegram chat-member updates. The bot must be a group admin and must receive chat-member updates. It detects repeated removals/admin demotions; it cannot undo an action before Telegram reports it.\n- The owner decision button is only sent when `OWNER_ID` is configured and the owner has opened the bot privately. If the suspected actor is still a group admin, Telegram may prevent the bot from banning them; the group creator may need to demote them first.\n- These protections are OFF by default. Enable `/security on`, then `/antilink on` and/or `/antispam on` per group. Add recruitment/scam phrases with `/addfilterword phrase`; the bot deletes group messages containing those phrases.\n\n## Important storage note
 The database is SQLite at `replies.db`. Render Free Web Services use an ephemeral filesystem, so database contents may be lost after a restart, redeploy, or instance replacement. Use `/backup` regularly and configure `OWNER_ID` for scheduled backups. For reliable permanent storage, move the database to persistent storage or a managed database.
 
 ## Local run
