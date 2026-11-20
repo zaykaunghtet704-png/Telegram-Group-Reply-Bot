@@ -58,7 +58,7 @@ class Connection:
 
     def execute(self, sql, params=()):
         statement = sql.strip()
-        pragma = re.fullmatch(r"PRAGMA\\s+table_info\\((\\w+)\\)", statement, re.I)
+        pragma = re.fullmatch(r"PRAGMA[ ]+table_info[(]([A-Za-z0-9_]+)[)]", statement, re.I)
         if pragma:
             table = pragma.group(1)
             rows = self.raw.execute(
@@ -73,18 +73,18 @@ class Connection:
                 for i, row in enumerate(rows)
             ]))
 
-        statement = re.sub(r"^INSERT\\s+OR\\s+IGNORE\\s+INTO", "INSERT INTO", statement, flags=re.I)
+        statement = re.sub(r"^INSERT[ ]+OR[ ]+IGNORE[ ]+INTO", "INSERT INTO", statement, flags=re.I)
         if sql.strip().upper().startswith("INSERT OR IGNORE"):
             if "ON CONFLICT" not in statement.upper():
                 statement += " ON CONFLICT DO NOTHING"
 
         auto_id = False
-        match = re.match(r"INSERT\\s+INTO\\s+(\\w+)", statement, re.I)
+        match = re.match(r"INSERT[ ]+INTO[ ]+([A-Za-z0-9_]+)", statement, re.I)
         if match and match.group(1).lower() in SERIAL_TABLES and "RETURNING" not in statement.upper():
             statement += " RETURNING id"
             auto_id = True
 
-        statement = re.sub(r"INTEGER\\s+PRIMARY\\s+KEY\\s+AUTOINCREMENT", "BIGSERIAL PRIMARY KEY", statement, flags=re.I)\n        statement = re.sub(r"INTEGER\\s+PRIMARY\\s+KEY", "BIGINT PRIMARY KEY", statement, flags=re.I)\n        statement = statement.replace("?", "%s")
+        statement = re.sub(r"INTEGER[ ]+PRIMARY[ ]+KEY[ ]+AUTOINCREMENT", "BIGSERIAL PRIMARY KEY", statement, flags=re.I)
         cur = self.raw.execute(statement, params or ())
         lastrowid = None
         if auto_id:
