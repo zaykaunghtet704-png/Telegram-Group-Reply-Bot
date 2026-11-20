@@ -119,6 +119,12 @@ class Connection:
             flags=re.I,
         )
         statement = re.sub(r"\bINTEGER\b", "BIGINT", statement, flags=re.I)
+        statement = re.sub(
+            r"(TEXT[ ]+NOT[ ]+NULL[ ]+DEFAULT)[ ]+CURRENT_TIMESTAMP\\b",
+            r"\\1 CURRENT_TIMESTAMP::text",
+            statement,
+            flags=re.I,
+        )
 
         auto_id = False
         match = re.match(r"INSERT[ ]+INTO[ ]+([A-Za-z0-9_]+)", statement, re.I)
