@@ -118,7 +118,7 @@ class DatabaseAdapterTests(unittest.TestCase):
             self.assertNotIn("AUTOINCREMENT", sql.upper())
             self.assertNotRegex(
                 sql,
-                r"TEXT\\s+NOT\\s+NULL\\s+DEFAULT\\s+CURRENT_TIMESTAMP(?!::text)",
+                r"TEXT\s+NOT\s+NULL\s+DEFAULT\s+CURRENT_TIMESTAMP(?!::text)",
             )
 
     def test_legacy_pragma_returns_sqlite_compatible_rows(self):
