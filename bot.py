@@ -650,6 +650,40 @@ async def panel_callback(update, context):
         await q.edit_message_text("အသုံးပြုနည်းအတွက် /help ကိုနှိပ်ပါ။")
 
 
+async def import_sqlite_command(update, context):
+    user = update.effective_user
+    msg = update.effective_message
+    if not user or user.id != OWNER_ID:
+        await msg.reply_text("⛔ Bot Owner သာ SQLite Backup တင်သွင်းနိုင်ပါတယ်။")
+        return
+    source = msg.reply_to_message
+    document = source.document if source else None
+    if not document:
+        await msg.reply_text("SQLite Backup ဖိုင်ကို Bot ဆီ ပို့ပြီး အဲဒီဖိုင်ကို Reply လုပ်ကာ /importsqlite ပို့ပါ။")
+        return
+    filename = (document.file_name or "").lower()
+    if not filename.endswith((".db", ".sqlite", ".sqlite3")):
+        await msg.reply_text("❌ .db, .sqlite သို့မဟုတ် .sqlite3 ဖိုင်သာ လက်ခံပါတယ်။")
+        return
+    if DB_PATH.exists():
+        await msg.reply_text("⚠️ replies.db ဖိုင် ရှိပြီးသားဖြစ်လို့ အစားမထိုးပါ။ Data မပျက်အောင် အရင်စစ်ဆေးဖို့လိုပါတယ်။")
+        return
+    try:
+        telegram_file = await context.bot.get_file(document.file_id)
+        await telegram_file.download_to_drive(custom_path=str(DB_PATH))
+        result = migrate_sqlite_once()
+        if result.get("status") == "imported":
+            details = "\\n".join(f"{name}: {count}" for name, count in result.get("tables", {}).items())
+            await msg.reply_text("✅ SQLite Data ကို PostgreSQL ထဲ ပြောင်းသွင်းပြီးပါပြီ။\\n" + (details or "Table Data မတွေ့ပါ။"))
+        elif result.get("status") == "already_done":
+            await msg.reply_text("ℹ️ SQLite Data ကို အရင်က ပြောင်းသွင်းပြီးသားပါ။")
+        else:
+            await msg.reply_text("❌ Import မလုပ်နိုင်ပါ။ " + str(result.get("reason", "Unknown error")))
+    except Exception:
+        logger.exception("SQLite import failed")
+        await msg.reply_text("❌ SQLite Import မအောင်မြင်ပါ။ Render Logs ကို စစ်ဆေးပါ။")
+
+
 async def backup(update, context):
     if not await require_admin(update, context):
         return
@@ -991,6 +1025,7 @@ def main():
     app.add_handler(CommandHandler("replysettings", reply_settings))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("backup", backup))
+    app.add_handler(CommandHandler("importsqlite", import_sqlite_command))
     app.add_handler(CallbackQueryHandler(owner_security_callback, pattern=r"^raid:"))
     app.add_handler(CallbackQueryHandler(panel_callback, pattern=r"^panel:"))
     app.add_handler(ChatMemberHandler(lambda u, ctx: monitor_member_change(u, ctx, OWNER_ID), ChatMemberHandler.CHAT_MEMBER))
