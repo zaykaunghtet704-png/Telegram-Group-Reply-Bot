@@ -4,7 +4,6 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.constants import ChatMemberStatus
 
 DB_PATH = Path(__file__).resolve().parent / "replies.db"
 SPAM_WINDOW = defaultdict(deque)
@@ -47,7 +46,7 @@ def contains_link(text):
     return bool(re.search(r"(https?://|www\\.|t\\.me/|telegram\\.me/|\\b[a-z0-9-]+\\.(com|net|org|io|me|xyz|site|online|info)\\b)",text,re.I))
 
 def is_admin_member(member):
-    return member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER)
+    return member.status in ("administrator", "creator")
 
 async def moderate_message(update, context, owner_id):
     msg=update.effective_message
@@ -88,8 +87,8 @@ async def monitor_member_change(update, context, owner_id):
     if actor.is_bot or actor.id==owner_id or actor.id==target.id: return
     old=change.old_chat_member.status
     new=change.new_chat_member.status
-    removal=(new in (ChatMemberStatus.BANNED,ChatMemberStatus.LEFT) and old not in (ChatMemberStatus.BANNED,ChatMemberStatus.LEFT))
-    demotion=(old in (ChatMemberStatus.ADMINISTRATOR,ChatMemberStatus.OWNER) and new not in (ChatMemberStatus.ADMINISTRATOR,ChatMemberStatus.OWNER))
+    removal=(new in ("kicked", "left") and old not in ("kicked", "left"))
+    demotion=(old in ("administrator", "creator") and new not in ("administrator", "creator"))
     if not (removal or demotion): return
     action="member removal" if removal else "admin demotion"
     now=time.time()
@@ -97,6 +96,7 @@ async def monitor_member_change(update, context, owner_id):
         c.execute("INSERT INTO raid_actions(chat_id,actor_id,target_id,action,created_at) VALUES(?,?,?,?,?)",(chat.id,actor.id,target.id,action,now))
         c.execute("DELETE FROM raid_actions WHERE created_at<?",(now-120,))
         cfg=get_security(chat.id)
+        if not cfg["enabled"]: return
         n=c.execute("SELECT COUNT(*) n FROM raid_actions WHERE chat_id=? AND actor_id=? AND created_at>=?",(chat.id,actor.id,now-60)).fetchone()["n"]
         if n < cfg["raid_limit"]: return
         recent=c.execute("SELECT id FROM owner_cases WHERE chat_id=? AND actor_id=? AND status='pending' AND created_at>=?",(chat.id,actor.id,now-300)).fetchone()
