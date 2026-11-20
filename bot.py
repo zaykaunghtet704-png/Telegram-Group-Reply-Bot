@@ -450,7 +450,10 @@ async def stats(update, context):
         return
     with db() as conn:
         count = conn.execute("SELECT COUNT(*) n FROM replies WHERE chat_id=?", (update.effective_chat.id,)).fetchone()["n"]
-    await update.effective_message.reply_text("📊 ဒီ Group မှာ Reply " + str(count) + " ခု ရှိပါတယ်။")
+        hits = conn.execute("SELECT COALESCE(SUM(hits),0) n FROM replies WHERE chat_id=?", (update.effective_chat.id,)).fetchone()["n"]
+        top = conn.execute("SELECT keyword,hits FROM replies WHERE chat_id=? ORDER BY hits DESC LIMIT 5", (update.effective_chat.id,)).fetchall()
+    top_text = "\n".join(f'{r["keyword"]}: {r["hits"]} ကြိမ်' for r in top) or "မရှိသေးပါ"
+    await update.effective_message.reply_text(f"📊 Group Statistics\nReply စည်းမျဉ်း: {count} ခု\nပို့ပြီးအကြိမ်: {hits}\n\n🏆 လူသုံးများသော Keyword\n{top_text}")
 
 
 async def panel(update, context):
@@ -611,6 +614,11 @@ async def post_init(app):
         ("panel", "Admin dashboard"),
         ("addreply", "Add keyword reply"),
         ("listreplies", "List replies"),
+        ("setpriority", "Set reply priority"),
+        ("setflood", "Set flood protection"),
+        ("setwelcome", "Toggle welcome messages"),
+        ("setgoodbye", "Toggle goodbye messages"),
+        ("setgroupcooldown", "Set group cooldown"),
     ])
     if OWNER_ID:
         app.job_queue.run_repeating(
