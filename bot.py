@@ -1,12 +1,13 @@
 import hashlib
 import asyncio
+from io import BytesIO
 import logging
 import os
 import random
 import time
 from collections import defaultdict, deque
 from pathlib import Path
-from database import connect as db, DB_PATH, migrate_sqlite_once
+from database import connect as db, DB_PATH, migrate_sqlite_once, export_database_json
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError, RetryAfter, Forbidden
@@ -652,25 +653,32 @@ async def panel_callback(update, context):
 async def backup(update, context):
     if not await require_admin(update, context):
         return
-    await context.bot.send_document(
-        chat_id=update.effective_chat.id,
-        document=open(DB_PATH, "rb"),
-        filename="replies-backup.sqlite3",
-        caption="🗄️ Database Backup",
-    )
+    try:
+        data = BytesIO(export_database_json())
+        data.name = "pro-reply-postgresql-backup.json"
+        await context.bot.send_document(
+            chat_id=update.effective_chat.id,
+            document=data,
+            filename=data.name,
+            caption="🗄️ PostgreSQL Database Backup",
+        )
+    except Exception:
+        logger.exception("Manual database backup failed")
+        await update.effective_message.reply_text("❌ Database Backup မအောင်မြင်ပါ။ Log စစ်ဆေးပါ။")
 
 
 async def automatic_backup(context):
-    if not OWNER_ID or not DB_PATH.exists():
+    if not OWNER_ID:
         return
     try:
-        with DB_PATH.open("rb") as f:
-            await context.bot.send_document(
-                chat_id=OWNER_ID,
-                document=f,
-                filename="automatic-replies-backup.sqlite3",
-                caption="🗄️ Automatic database backup",
-            )
+        data = BytesIO(export_database_json())
+        data.name = "automatic-pro-reply-postgresql-backup.json"
+        await context.bot.send_document(
+            chat_id=OWNER_ID,
+            document=data,
+            filename=data.name,
+            caption="🗄️ Automatic PostgreSQL database backup",
+        )
     except Exception:
         logger.exception("Automatic backup failed")
 
