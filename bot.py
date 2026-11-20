@@ -12,7 +12,7 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     ContextTypes, ChatMemberHandler, filters,
 )
-from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision
+from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision, add_blocked_word, list_blocked_words, delete_blocked_word
 from learning import (
     init_learning_db, get_learning_settings, set_learning_setting,
     record_conversation, find_learned_reply, list_learned,
@@ -215,6 +215,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/antilink on|off — Link ဖျက်ခြင်း\n"
         "/antispam on|off — ထပ်ခါထပ်ခါစာ ဖျက်ခြင်း\n"
         "/setraidlimit 3 — Anti-Nuke သတိပေးအဆင့်\n"
+        "/addfilterword စာသား — တားမြစ်စာသားထည့်ရန်\n"
+        "/listfilterwords — တားမြစ်စာသားစာရင်း\n"
+        "/delfilterword ID — တားမြစ်စာသားဖျက်ရန်\n"
         "/learned — သင်ယူထားသော စကားတွဲကြည့်ရန်\n"
         "/forgetlearned ID — သင်ယူထားသော စကားတွဲဖျက်ရန်\n"
         "/setlearnthreshold 50-95 — တူညီမှုအဆင့် သတ်မှတ်ရန်\n"
@@ -724,6 +727,28 @@ async def set_raid_limit_command(update, context):
     set_security(update.effective_chat.id,"raid_limit",int(context.args[0]))
     await update.effective_message.reply_text("🚨 Anti-Nuke သတိပေးအဆင့် ပြင်ပြီးပါပြီ။")
 
+
+async def add_filter_word_command(update, context):
+    if not await require_admin(update, context): return
+    word=update.effective_message.text.partition(" ")[2].strip()
+    if not word:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /addfilterword စစ်ဆေးလိုသောစာသား")
+        return
+    ok=add_blocked_word(update.effective_chat.id,word)
+    await update.effective_message.reply_text("🚫 Filter စာသားထည့်ပြီးပါပြီ။" if ok else "စာသားမမှန်ပါ သို့မဟုတ် ရှိပြီးသားပါ။")
+
+async def list_filter_words_command(update, context):
+    if not await require_admin(update, context): return
+    rows=list_blocked_words(update.effective_chat.id)
+    await update.effective_message.reply_text("🚫 Filter စာရင်း\n"+("\n".join(f'{r["id"]}. {r["word"]}' for r in rows) or "မရှိသေးပါ။"))
+
+async def delete_filter_word_command(update, context):
+    if not await require_admin(update, context): return
+    if not context.args or not context.args[0].isdigit():
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /delfilterword ID"); return
+    ok=delete_blocked_word(update.effective_chat.id,int(context.args[0]))
+    await update.effective_message.reply_text("🗑️ Filter ဖျက်ပြီးပါပြီ။" if ok else "ID မတွေ့ပါ။")
+
 async def owner_security_callback(update, context):
     handled=await owner_raid_decision(update,context,OWNER_ID)
     if not handled:
@@ -745,6 +770,9 @@ async def post_init(app):
         ("antilink", "Delete unauthorized links"),
         ("antispam", "Delete repeated spam"),
         ("setraidlimit", "Set anti-nuke alert threshold"),
+        ("addfilterword", "Add blocked phrase"),
+        ("listfilterwords", "List blocked phrases"),
+        ("delfilterword", "Delete blocked phrase"),
         ("learn", "Toggle conversation learning"),
         ("learned", "List learned conversations"),
         ("forgetlearned", "Delete learned pair"),
@@ -790,6 +818,9 @@ def main():
     app.add_handler(CommandHandler("antilink", antilink_command))
     app.add_handler(CommandHandler("antispam", antispam_command))
     app.add_handler(CommandHandler("setraidlimit", set_raid_limit_command))
+    app.add_handler(CommandHandler("addfilterword", add_filter_word_command))
+    app.add_handler(CommandHandler("listfilterwords", list_filter_words_command))
+    app.add_handler(CommandHandler("delfilterword", delete_filter_word_command))
     app.add_handler(CommandHandler("learn", set_learning))
     app.add_handler(CommandHandler("learned", learned_list_command))
     app.add_handler(CommandHandler("forgetlearned", forget_learned_command))
