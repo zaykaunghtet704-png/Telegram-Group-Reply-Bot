@@ -100,3 +100,14 @@ Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, an
 - Automated 18+ text detections are logged to the configured owner where private messages are available.
 - The built-in filter checks text and captions only. It does not visually classify image/video content and may miss obfuscated wording or produce false positives. Admins are exempt.
 - The bot needs Delete Messages permission for deletion and Restrict Members / Ban Users permission for escalation.
+
+
+## Bot-owner advertising and role separation
+- The configured global Bot Owner ID is `7974865879` (also set in `render.yaml` and `.env.example`).
+- Bot Owner can broadcast a replied-to text, photo, video, or other Telegram-copyable message with `/ad groups`, `/ad users`, or `/ad all`.
+- `/adstats` shows active known groups and opted-in private users.
+- A user must first open the bot and press Start before the bot can send private messages. Users can opt out with `/ads off` and opt back in with `/ads on`.
+- Group owners and group admins can manage only their own group's reply and moderation settings. They cannot use global advertising commands or control other groups.
+- The Bot Owner is exempt from the bot's automatic group text moderation and cannot be targeted by its warning/anti-nuke actions.
+- The bot only tracks groups after it receives an update from them, and private users after they start the bot. Broadcast delivery is subject to Telegram limits, blocked DMs, and the bot's current database. Render Free ephemeral storage may erase this audience list after redeploy/restart.
+- Send ads responsibly and only to users who have started the bot and have not opted out.
