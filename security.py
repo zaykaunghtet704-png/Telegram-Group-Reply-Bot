@@ -1,17 +1,10 @@
 import re
-import sqlite3
 import time
 from collections import defaultdict, deque
-from pathlib import Path
+from database import connect as _db
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-DB_PATH = Path(__file__).resolve().parent / "replies.db"
 SPAM_WINDOW = defaultdict(deque)
-
-def _db():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 def init_security_db():
     with _db() as c:
