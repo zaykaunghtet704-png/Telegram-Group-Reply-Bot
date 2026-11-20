@@ -78,7 +78,7 @@ async def moderate_message(update, context, owner_id):
     msg=update.effective_message
     chat=update.effective_chat
     user=update.effective_user
-    if not msg or not chat or chat.type not in ("group","supergroup") or not user or user.is_bot:
+    if not msg or not chat or chat.type not in ("group","supergroup") or not user or user.is_bot or (owner_id and user.id == owner_id):
         return
     cfg=get_security(chat.id)
     if not cfg["enabled"]: return
@@ -115,7 +115,7 @@ async def monitor_member_change(update, context, owner_id):
     if chat.type not in ("group","supergroup"): return
     actor=change.from_user
     target=change.new_chat_member.user
-    if actor.is_bot or actor.id==owner_id or actor.id==target.id: return
+    if actor.is_bot or actor.id==owner_id or target.id==owner_id or actor.id==target.id: return
     old=change.old_chat_member.status
     new=change.new_chat_member.status
     removal=(new in ("kicked", "left") and old not in ("kicked", "left"))
