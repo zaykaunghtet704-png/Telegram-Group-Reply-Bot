@@ -12,6 +12,11 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     ContextTypes, filters,
 )
+from learning import (
+    init_learning_db, get_learning_settings, set_learning_setting,
+    record_conversation, find_learned_reply, list_learned,
+    delete_learned, clear_pending,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "replies.db"
@@ -204,6 +209,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setflood 0-30 — Flood ကာကွယ်မှု\n"
         "/setwelcome on|off — Welcome\n"
         "/setgoodbye on|off — Goodbye\n"
+        "/learn on|off — Group စကားမှ သင်ယူမှု ဖွင့်/ပိတ်ရန်\n"
+        "/learned — သင်ယူထားသော စကားတွဲကြည့်ရန်\n"
+        "/forgetlearned ID — သင်ယူထားသော စကားတွဲဖျက်ရန်\n"
+        "/setlearnthreshold 50-95 — တူညီမှုအဆင့် သတ်မှတ်ရန်\n"
         "/replysettings — Setting ကြည့်ရန်\n"
         "/stats — စာရင်းအင်း\n"
         "/backup — Database Backup ယူရန်\n\n"
@@ -441,7 +450,9 @@ async def reply_settings(update, context):
         + "Chance: " + str(s["chance"]) + "%\n"
         + "Cooldown: " + str(s["cooldown"]) + " sec\n"
         + "Match: " + s["match_mode"] + "\n"
-        + "Language: " + s["language"]
+        + "Language: " + s["language"] + "\n"
+        + "Learning: " + ("ON" if get_learning_settings(update.effective_chat.id)["enabled"] else "OFF") + "\n"
+        + "Learning threshold: " + str(get_learning_settings(update.effective_chat.id)["threshold"]) + "%"
     )
 
 
@@ -552,14 +563,86 @@ async def automatic_backup(context):
         logger.exception("Automatic backup failed")
 
 
+
+
+async def set_learning(update, context):
+    if not await require_admin(update, context):
+        return
+    if not context.args or context.args[0].lower() not in ("on", "off"):
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /learn on သို့မဟုတ် /learn off")
+        return
+    enabled = int(context.args[0].lower() == "on")
+    set_learning_setting(update.effective_chat.id, "enabled", enabled)
+    message = "🧠 Learning ON ဖြစ်ပါပြီ။ Group ထဲက လူနှစ်ယောက် ဆက်တိုက်ပြောဆိုတဲ့ စကားတွေကို မေးခွန်း/အဖြေ စကားတွဲအဖြစ် မှတ်သားပါမယ်။ Group အဖွဲ့ဝင်များကို အသိပေးထားပါ။" if enabled else "🧠 Learning OFF ဖြစ်ပါပြီ။ သိမ်းထားပြီးသား စကားတွဲများ မပျက်ပါ။"
+    await update.effective_message.reply_text(message)
+
+
+async def learned_list_command(update, context):
+    if not await require_admin(update, context):
+        return
+    total, rows = list_learned(update.effective_chat.id)
+    if not rows:
+        await update.effective_message.reply_text("🧠 သင်ယူထားသော စကားတွဲ မရှိသေးပါ။ /learn on ဖြင့် စတင်ပါ။")
+        return
+    lines = [f"🧠 သင်ယူထားသော စကားတွဲ ({total} ခု၊ နောက်ဆုံး 30 ခု)"]
+    for row in rows:
+        lines.append(f'{row["id"]}. {row["prompt"][:45]} → {row["response"][:45]} ({row["hits"]} ကြိမ်)')
+    await update.effective_message.reply_text("\n".join(lines))
+
+
+async def forget_learned_command(update, context):
+    if not await require_admin(update, context):
+        return
+    if not context.args or not context.args[0].isdigit():
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /forgetlearned 12")
+        return
+    deleted = delete_learned(update.effective_chat.id, int(context.args[0]))
+    await update.effective_message.reply_text("🗑️ ဖျက်ပြီးပါပြီ။" if deleted else "ဒီ ID ကို မတွေ့ပါဘူး။")
+
+
+async def set_learn_threshold(update, context):
+    if not await require_admin(update, context):
+        return
+    if not context.args or not context.args[0].isdigit() or not 50 <= int(context.args[0]) <= 95:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /setlearnthreshold 72 (50-95)")
+        return
+    set_learning_setting(update.effective_chat.id, "threshold", int(context.args[0]))
+    await update.effective_message.reply_text("🎯 Learning တူညီမှုအဆင့်ကို " + context.args[0] + "% သတ်မှတ်ပြီးပါပြီ။")
+
+
 async def handle_text(update, context):
     msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
     if not msg or not msg.text or not is_group(chat) or not user or user.is_bot:
         return
     s = get_settings(chat.id)
+    now = time.time()
+    learning = get_learning_settings(chat.id)
+    if learning["enabled"]:
+        try:
+            learned = find_learned_reply(chat.id, msg.text, learning["threshold"])
+            if learned and s["enabled"] and random.randint(1, 100) <= s["chance"]:
+                with db() as conn:
+                    last = conn.execute("SELECT last_reply FROM usage WHERE chat_id=? AND user_id=?", (chat.id, user.id)).fetchone()
+                cooldown_ok = not last or now - last["last_reply"] >= s["cooldown"]
+                group_cd = int(s.get("group_cooldown", 0))
+                group_ok = not group_cd or now - GROUP_LAST_REPLY[chat.id] >= group_cd
+                if cooldown_ok and group_ok:
+                    await msg.reply_text(learned["response"], reply_to_message_id=msg.message_id)
+                    GROUP_LAST_REPLY[chat.id] = now
+                    with db() as conn:
+                        conn.execute("UPDATE learned_pairs SET hits=hits+1 WHERE id=?", (learned["id"],))
+                        conn.execute(
+                            "INSERT INTO usage(chat_id,user_id,last_reply) VALUES(?,?,?) "
+                            "ON CONFLICT(chat_id,user_id) DO UPDATE SET last_reply=excluded.last_reply",
+                            (chat.id, user.id, now),
+                        )
+                    clear_pending(chat.id)
+                    return
+            record_conversation(chat.id, user.id, msg.text)
+        except Exception:
+            logger.exception("Conversation learning failed")
     if not s["enabled"] or random.randint(1, 100) > s["chance"]:
         return
-    now = time.time()
     with db() as conn:
         last = conn.execute("SELECT last_reply FROM usage WHERE chat_id=? AND user_id=?", (chat.id, user.id)).fetchone()
         if last and now - last["last_reply"] < s["cooldown"]:
@@ -583,16 +666,13 @@ async def handle_text(update, context):
         if not key:
             continue
         mode = s["match_mode"]
-        matched = (
-            incoming == key if mode == "exact"
-            else incoming.startswith(key) if mode == "startswith"
-            else key in incoming
-        )
+        matched = incoming == key if mode == "exact" else incoming.startswith(key) if mode == "startswith" else key in incoming
         if matched:
             matches.append(row)
     if not matches:
         return
-    selected = random.choice(matches)
+    highest_priority = max(row["priority"] for row in matches)
+    selected = random.choice([row for row in matches if row["priority"] == highest_priority])
     try:
         await send_reply(msg, selected)
         GROUP_LAST_REPLY[chat.id] = now
@@ -606,7 +686,6 @@ async def handle_text(update, context):
     except Exception:
         logger.exception("Auto reply failed")
 
-
 async def post_init(app):
     await app.bot.set_my_commands([
         ("start", "Start bot"),
@@ -619,6 +698,10 @@ async def post_init(app):
         ("setwelcome", "Toggle welcome messages"),
         ("setgoodbye", "Toggle goodbye messages"),
         ("setgroupcooldown", "Set group cooldown"),
+        ("learn", "Toggle conversation learning"),
+        ("learned", "List learned conversations"),
+        ("forgetlearned", "Delete learned pair"),
+        ("setlearnthreshold", "Set learning similarity"),
     ])
     if OWNER_ID:
         app.job_queue.run_repeating(
@@ -636,6 +719,7 @@ def main():
     if not render_url:
         raise RuntimeError("RENDER_EXTERNAL_URL is missing. Deploy this bot as a Render Web Service.")
     init_db()
+    init_learning_db()
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
@@ -654,6 +738,10 @@ def main():
     app.add_handler(CommandHandler("setflood", set_flood))
     app.add_handler(CommandHandler("setwelcome", set_welcome))
     app.add_handler(CommandHandler("setgoodbye", set_goodbye))
+    app.add_handler(CommandHandler("learn", set_learning))
+    app.add_handler(CommandHandler("learned", learned_list_command))
+    app.add_handler(CommandHandler("forgetlearned", forget_learned_command))
+    app.add_handler(CommandHandler("setlearnthreshold", set_learn_threshold))
     app.add_handler(CommandHandler("replysettings", reply_settings))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("backup", backup))
