@@ -665,12 +665,14 @@ async def import_sqlite_command(update, context):
     if not filename.endswith((".db", ".sqlite", ".sqlite3")):
         await msg.reply_text("❌ .db, .sqlite သို့မဟုတ် .sqlite3 ဖိုင်သာ လက်ခံပါတယ်။")
         return
-    if DB_PATH.exists():
-        await msg.reply_text("⚠️ replies.db ဖိုင် ရှိပြီးသားဖြစ်လို့ အစားမထိုးပါ။ Data မပျက်အောင် အရင်စစ်ဆေးဖို့လိုပါတယ်။")
+    if update.effective_chat.type != "private":
+        await msg.reply_text("လုံခြုံရေးအတွက် Bot Owner ရဲ့ Private Chat ထဲကနေသာ Import လုပ်ပါ။")
         return
     try:
-        telegram_file = await context.bot.get_file(document.file_id)
-        await telegram_file.download_to_drive(custom_path=str(DB_PATH))
+        # Reuse an already-downloaded backup after a failed attempt; never overwrite it.
+        if not DB_PATH.exists():
+            telegram_file = await context.bot.get_file(document.file_id)
+            await telegram_file.download_to_drive(custom_path=str(DB_PATH))
         result = migrate_sqlite_once()
         if result.get("status") == "imported":
             details = chr(10).join(f"{name}: {count}" for name, count in result.get("tables", {}).items())
@@ -685,20 +687,26 @@ async def import_sqlite_command(update, context):
 
 
 async def backup(update, context):
-    if not await require_admin(update, context):
+    user = update.effective_user
+    msg = update.effective_message
+    if not user or user.id != OWNER_ID:
+        await msg.reply_text("⛔ Bot Owner သာ Database Backup ယူနိုင်ပါတယ်။")
+        return
+    if update.effective_chat.type != "private":
+        await msg.reply_text("🔐 လုံခြုံရေးအတွက် Bot ကို Private Chat မှာ /backup ပို့ပါ။")
         return
     try:
         data = BytesIO(export_database_json())
         data.name = "pro-reply-postgresql-backup.json"
         await context.bot.send_document(
-            chat_id=update.effective_chat.id,
+            chat_id=OWNER_ID,
             document=data,
             filename=data.name,
             caption="🗄️ PostgreSQL Database Backup",
         )
     except Exception:
         logger.exception("Manual database backup failed")
-        await update.effective_message.reply_text("❌ Database Backup မအောင်မြင်ပါ။ Log စစ်ဆေးပါ။")
+        await msg.reply_text("❌ Database Backup မအောင်မြင်ပါ။ Render Logs ကို စစ်ဆေးပါ။")
 
 
 async def automatic_backup(context):
