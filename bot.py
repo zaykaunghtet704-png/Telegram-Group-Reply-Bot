@@ -938,6 +938,7 @@ async def owner_security_callback(update, context):
 async def post_init(app):
     await app.bot.set_my_commands([
         ("start", "Start bot"),
+        ("importsqlite", "Bot Owner: import old SQLite backup"),
         ("ad", "Bot Owner: broadcast an ad"),
         ("adstats", "Bot Owner: advertising targets"),
         ("ads", "Manage private ad messages"),
