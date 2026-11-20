@@ -85,8 +85,8 @@ class Connection:
             statement += " RETURNING id"
             auto_id = True
 
-        statement = re.sub(r"INTEGER[ ]+PRIMARY[ ]+KEY[ ]+AUTOINCREMENT", "BIGSERIAL PRIMARY KEY", statement, flags=re.I)
-        statement = re.sub(r"INTEGER[ ]+PRIMARY[ ]+KEY", "BIGINT PRIMARY KEY", statement, flags=re.I)
+        statement = statement.replace("INTEGER", "BIGINT")
+        statement = re.sub(r"BIGINT[ ]+PRIMARY[ ]+KEY[ ]+AUTOINCREMENT", "BIGSERIAL PRIMARY KEY", statement, flags=re.I)
         cur = self.raw.execute(statement, params or ())
         lastrowid = None
         if auto_id:
