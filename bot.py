@@ -219,7 +219,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/addfilterword စာသား — တားမြစ်စာသားထည့်ရန်\n"
         "/listfilterwords — တားမြစ်စာသားစာရင်း\n"
         "/delfilterword ID — တားမြစ်စာသားဖျက်ရန်\n"
-        "/adultfilter on|off — 18+ စာသား Filter\n"\n        "/warn အကြောင်းပြချက် — Reply လုပ်ထားသူကို Warn\n"\n        "/warns — Warn History ကြည့်ရန်\n"\n        "/resetwarn — Warn အားလုံးရှင်းရန်\n"\n        "/setwarnlimit 3 — Warn အများဆုံးအရေအတွက်\n"\n        "/setwarnaction mute|kick|ban — Warn ပြည့်လျှင် အရေးယူမှု\n"
+        "/adultfilter on|off — 18+ စာသား Filter\n"
+        "/warn အကြောင်းပြချက် — Reply လုပ်ထားသူကို Warn\n"
+        "/warns — Warn History ကြည့်ရန်\n"
+        "/resetwarn — Warn အားလုံးရှင်းရန်\n"
+        "/setwarnlimit 3 — Warn အများဆုံးအရေအတွက်\n"
+        "/setwarnaction mute|kick|ban — Warn ပြည့်လျှင် အရေးယူမှု\n"
         "/learned — သင်ယူထားသော စကားတွဲကြည့်ရန်\n"
         "/forgetlearned ID — သင်ယူထားသော စကားတွဲဖျက်ရန်\n"
         "/setlearnthreshold 50-95 — တူညီမှုအဆင့် သတ်မှတ်ရန်\n"
@@ -852,7 +857,12 @@ def main():
     app.add_handler(CommandHandler("setwelcome", set_welcome))
     app.add_handler(CommandHandler("setgoodbye", set_goodbye))
     app.add_handler(CommandHandler("adultfilter", adult_filter_command))
-    app.add_handler(CommandHandler("warn", warn_command))\n    app.add_handler(CommandHandler("warns", warns_command))\n    app.add_handler(CommandHandler("resetwarn", reset_warn_command))\n    app.add_handler(CommandHandler("setwarnlimit", set_warn_limit_command))\n    app.add_handler(CommandHandler("setwarnaction", set_warn_action_command))\n    app.add_handler(CommandHandler("security", security_command))
+    app.add_handler(CommandHandler("warn", warn_command))
+    app.add_handler(CommandHandler("warns", warns_command))
+    app.add_handler(CommandHandler("resetwarn", reset_warn_command))
+    app.add_handler(CommandHandler("setwarnlimit", set_warn_limit_command))
+    app.add_handler(CommandHandler("setwarnaction", set_warn_action_command))
+    app.add_handler(CommandHandler("security", security_command))
     app.add_handler(CommandHandler("antilink", antilink_command))
     app.add_handler(CommandHandler("antispam", antispam_command))
     app.add_handler(CommandHandler("setraidlimit", set_raid_limit_command))
@@ -869,7 +879,8 @@ def main():
     app.add_handler(CallbackQueryHandler(owner_security_callback, pattern=r"^raid:"))
     app.add_handler(CallbackQueryHandler(panel_callback, pattern=r"^panel:"))
     app.add_handler(ChatMemberHandler(lambda u, ctx: monitor_member_change(u, ctx, OWNER_ID), ChatMemberHandler.CHAT_MEMBER))
-    app.add_handler(MessageHandler((filters.TEXT & ~filters.COMMAND) | filters.CAPTION, lambda u, ctx: moderate_content(u, ctx, OWNER_ID)), group=-2)\n    app.add_handler(MessageHandler((filters.TEXT & ~filters.COMMAND) | filters.CAPTION, lambda u, ctx: moderate_message(u, ctx, OWNER_ID), block=False), group=-1)
+    app.add_handler(MessageHandler((filters.TEXT & ~filters.COMMAND) | filters.CAPTION, lambda u, ctx: moderate_content(u, ctx, OWNER_ID)), group=-2)
+    app.add_handler(MessageHandler((filters.TEXT & ~filters.COMMAND) | filters.CAPTION, lambda u, ctx: moderate_message(u, ctx, OWNER_ID), block=False), group=-1)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, member_update))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
