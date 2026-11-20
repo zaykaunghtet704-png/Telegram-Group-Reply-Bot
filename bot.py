@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 import random
@@ -306,8 +307,23 @@ def main():
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
-    logger.info("Telegram Group Auto Reply Bot is running")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    render_url = os.getenv("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
+    if not render_url:
+        raise RuntimeError("RENDER_EXTERNAL_URL is missing. Deploy this bot as a Render Web Service.")
+
+    webhook_path = hashlib.sha256(BOT_TOKEN.encode("utf-8")).hexdigest()
+    port = int(os.getenv("PORT", "10000"))
+
+    logger.info("Telegram Group Auto Reply Bot is starting in webhook mode")
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path=webhook_path,
+        webhook_url=f"{render_url}/{webhook_path}",
+        secret_token=webhook_path,
+        allowed_updates=Update.ALL_TYPES,
+        bootstrap_retries=-1,
+    )
 
 
 if __name__ == "__main__":
