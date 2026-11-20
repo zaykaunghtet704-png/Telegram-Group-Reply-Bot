@@ -49,6 +49,13 @@ class DatabaseAdapterTests(unittest.TestCase):
         self.assertIn("BIGSERIAL PRIMARY KEY", sql)
         self.assertIn("chat_id BIGINT", sql)
 
+    def test_text_timestamp_default_is_cast_for_postgres(self):
+        raw = FakeRawConnection()
+        db = Connection(raw)
+        db.execute("CREATE TABLE replies (created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")
+        sql = raw.calls[-1][0]
+        self.assertIn("CURRENT_TIMESTAMP::text", sql)
+
     def test_insert_ignore_and_lastrowid(self):
         raw = FakeRawConnection()
         db = Connection(raw)
