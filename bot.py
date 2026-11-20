@@ -1,4 +1,5 @@
 import hashlib
+import asyncio
 import logging
 import os
 import random
@@ -8,6 +9,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import TelegramError, RetryAfter, Forbidden
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     ContextTypes, ChatMemberHandler, filters,
@@ -23,7 +25,7 @@ from learning import (
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "replies.db"
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
-OWNER_ID = int(os.getenv("OWNER_ID", "0") or 0)
+OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
 BACKUP_INTERVAL_HOURS = max(1, int(os.getenv("BACKUP_INTERVAL_HOURS", "24")))
 
 logging.basicConfig(
@@ -89,6 +91,14 @@ def init_db():
             if column not in columns:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_replies_chat ON replies(chat_id)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS known_users (
+            user_id INTEGER PRIMARY KEY, first_seen REAL NOT NULL,
+            ads_enabled INTEGER NOT NULL DEFAULT 1
+        )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS known_groups (
+            chat_id INTEGER PRIMARY KEY, title TEXT NOT NULL DEFAULT '',
+            first_seen REAL NOT NULL, active INTEGER NOT NULL DEFAULT 1
+        )""")
 
 
 def get_settings(chat_id):
@@ -184,12 +194,107 @@ async def send_reply(message, row):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user and update.effective_chat and update.effective_chat.type == "private":
+        with db() as conn:
+            conn.execute("INSERT OR IGNORE INTO known_users(user_id,first_seen) VALUES(?,?)", (user.id, time.time()))
     await update.effective_message.reply_text(
         "🤖 PRO Reply Bot Ultimate X\n"
         "Keyword သတ်မှတ်ထားတဲ့အတိုင်း အလိုအလျောက် Reply ပြန်ပေးပါတယ်။\n"
         "အသုံးပြုနည်း: /help"
     )
 
+
+
+def register_seen_update(update):
+    chat = update.effective_chat
+    user = update.effective_user
+    if chat and chat.type in ("group", "supergroup"):
+        with db() as conn:
+            conn.execute("INSERT INTO known_groups(chat_id,title,first_seen,active) VALUES(?,?,?,1) "
+                         "ON CONFLICT(chat_id) DO UPDATE SET title=excluded.title,active=1",
+                         (chat.id, chat.title or "", time.time()))
+    elif chat and chat.type == "private" and user:
+        with db() as conn:
+            conn.execute("INSERT OR IGNORE INTO known_users(user_id,first_seen) VALUES(?,?)",
+                         (user.id, time.time()))
+
+async def track_chats(update, context):
+    register_seen_update(update)
+
+async def owner_ad_command(update, context):
+    user, msg = update.effective_user, update.effective_message
+    if not OWNER_ID or not user or user.id != OWNER_ID:
+        if msg: await msg.reply_text("⛔ Bot Owner သာ ကြော်ငြာပို့နိုင်ပါတယ်။")
+        return
+    if not msg.reply_to_message:
+        await msg.reply_text("ကြော်ငြာစာ/ပုံ/Video ကို Reply လုပ်ပြီး /ad groups|users|all ဟု ပို့ပါ။")
+        return
+    target = context.args[0].lower() if context.args else ""
+    if target not in ("groups", "users", "all"):
+        await msg.reply_text("အသုံးပြုပုံ: ကြော်ငြာကို Reply လုပ်ပြီး /ad groups|users|all")
+        return
+    source = msg.reply_to_message
+    with db() as conn:
+        groups = [r["chat_id"] for r in conn.execute("SELECT chat_id FROM known_groups WHERE active=1").fetchall()]
+        users = [r["user_id"] for r in conn.execute("SELECT user_id FROM known_users WHERE ads_enabled=1").fetchall()]
+    targets = groups if target == "groups" else users if target == "users" else groups + users
+    if not targets:
+        await msg.reply_text("ပို့ရန် Group/User မရှိသေးပါ။")
+        return
+    status = await msg.reply_text(f"📢 ကြော်ငြာပို့နေပါပြီ။\nTarget: {target}\nစုစုပေါင်း: {len(targets)}")
+    sent = failed = 0
+    for chat_id in targets:
+        try:
+            await context.bot.copy_message(chat_id=chat_id, from_chat_id=source.chat_id, message_id=source.message_id)
+            sent += 1
+        except RetryAfter as exc:
+            await asyncio.sleep(float(exc.retry_after) + 0.5)
+            try:
+                await context.bot.copy_message(chat_id=chat_id, from_chat_id=source.chat_id, message_id=source.message_id)
+                sent += 1
+            except TelegramError:
+                failed += 1
+        except (Forbidden, TelegramError):
+            failed += 1
+            if target in ("groups", "all"):
+                with db() as conn: conn.execute("UPDATE known_groups SET active=0 WHERE chat_id=?", (chat_id,))
+            else:
+                with db() as conn: conn.execute("UPDATE known_users SET ads_enabled=0 WHERE user_id=?", (chat_id,))
+        await asyncio.sleep(0.05)
+    await status.edit_text(f"📢 ကြော်ငြာပို့ပြီးပါပြီ။\nTarget: {target}\nအောင်မြင်: {sent}\nမအောင်မြင်: {failed}")
+
+async def owner_ad_stats(update, context):
+    msg, user = update.effective_message, update.effective_user
+    if not user or user.id != OWNER_ID:
+        if msg: await msg.reply_text("Bot Owner သာ ကြည့်နိုင်ပါတယ်。")
+        return
+    with db() as conn:
+        groups = conn.execute("SELECT COUNT(*) n FROM known_groups WHERE active=1").fetchone()["n"]
+        users = conn.execute("SELECT COUNT(*) n FROM known_users WHERE ads_enabled=1").fetchone()["n"]
+    await msg.reply_text(f"📊 ကြော်ငြာ Target စာရင်း\nGroups: {groups}\nBot DM Users: {users}\nAll: {groups+users}")
+
+async def ads_opt_out(update, context):
+    msg, user = update.effective_message, update.effective_user
+    if not user or not msg or update.effective_chat.type != "private": return
+    with db() as conn:
+        conn.execute("INSERT INTO known_users(user_id,first_seen,ads_enabled) VALUES(?,?,0) "
+                     "ON CONFLICT(user_id) DO UPDATE SET ads_enabled=0", (user.id, time.time()))
+    await msg.reply_text("ကြော်ငြာ DM ကို ပိတ်ပြီးပါပြီ။ ပြန်ဖွင့်ရန် /ads on")
+
+async def ads_opt_in(update, context):
+    msg, user = update.effective_message, update.effective_user
+    if not user or not msg or update.effective_chat.type != "private": return
+    with db() as conn:
+        conn.execute("INSERT INTO known_users(user_id,first_seen,ads_enabled) VALUES(?,?,1) "
+                     "ON CONFLICT(user_id) DO UPDATE SET ads_enabled=1", (user.id, time.time()))
+    await msg.reply_text("ကြော်ငြာ DM ကို ပြန်ဖွင့်ပြီးပါပြီ။")
+
+async def ads_command(update, context):
+    if context.args and context.args[0].lower() == "on":
+        await ads_opt_in(update, context)
+    else:
+        await ads_opt_out(update, context)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
@@ -840,6 +945,10 @@ def main():
     init_security_db()
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("ad", owner_ad_command))
+    app.add_handler(CommandHandler("adstats", owner_ad_stats))
+    app.add_handler(CommandHandler("ads", ads_command))
+    app.add_handler(MessageHandler(filters.ALL, track_chats), group=-10)
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("panel", panel))
     app.add_handler(CommandHandler("addreply", add_reply))
