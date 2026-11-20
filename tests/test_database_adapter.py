@@ -1,5 +1,11 @@
 import unittest
+from unittest.mock import patch
 
+import database
+import bot
+import security
+import moderation
+import learning
 from database import Connection
 
 
@@ -67,6 +73,53 @@ class DatabaseAdapterTests(unittest.TestCase):
         self.assertIn("ON CONFLICT DO NOTHING RETURNING id", sql)
         self.assertEqual(params, (-100123, "spam"))
         self.assertEqual(cur.lastrowid, 42)
+
+
+    def test_all_module_schemas_use_postgres_compatible_sql(self):
+        class CaptureRaw:
+            statements = []
+
+            def execute(self, sql, params=()):
+                self.statements.append(sql)
+                if "information_schema.columns" in sql:
+                    return FakeCursor([])
+                return FakeCursor()
+
+            def commit(self):
+                pass
+
+            def rollback(self):
+                pass
+
+            def close(self):
+                pass
+
+        raw_connections = []
+
+        def make_raw(**kwargs):
+            raw = CaptureRaw()
+            raw_connections.append(raw)
+            return raw
+
+        with patch.object(database, "DATABASE_URL", "postgresql://test"), \
+             patch.object(database.psycopg, "connect", side_effect=make_raw):
+            bot.init_db()
+            learning.init_learning_db()
+            security.init_security_db()
+            moderation.init_moderation_db()
+
+        statements = [
+            sql
+            for raw in raw_connections
+            for sql in raw.statements
+        ]
+        self.assertTrue(statements)
+        for sql in statements:
+            self.assertNotIn("AUTOINCREMENT", sql.upper())
+            self.assertNotRegex(
+                sql,
+                r"TEXT\\s+NOT\\s+NULL\\s+DEFAULT\\s+CURRENT_TIMESTAMP(?!::text)",
+            )
 
     def test_legacy_pragma_returns_sqlite_compatible_rows(self):
         raw = FakeRawConnection()
