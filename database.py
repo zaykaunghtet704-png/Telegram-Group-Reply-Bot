@@ -35,6 +35,9 @@ class _TupleRows:
     def fetchone(self):
         return self.rows.pop(0) if self.rows else None
 
+    def __iter__(self):
+        return iter(self.rows)
+
 
 class Cursor:
     def __init__(self, cursor, lastrowid=None):
