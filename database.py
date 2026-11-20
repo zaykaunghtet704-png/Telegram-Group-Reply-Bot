@@ -1,5 +1,6 @@
 """Shared SQLite/PostgreSQL compatibility layer and one-time SQLite importer."""
 import os
+import json
 import re
 import sqlite3
 from pathlib import Path
@@ -177,3 +178,18 @@ def migrate_sqlite_once():
             source.close()
 
     return {"status": "imported", "tables": imported}
+
+def export_database_json():
+    """Return a portable JSON backup of all application tables."""
+    payload = {"format": "pro-reply-postgresql-backup-v1", "tables": {}}
+    with connect() as pg:
+        for table in MIGRATION_TABLES:
+            exists = pg.execute(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema=current_schema() AND table_name=?", (table,)
+            ).fetchone()
+            if not exists:
+                continue
+            rows = pg.execute(f'SELECT * FROM "{table}"').fetchall()
+            payload["tables"][table] = rows
+    return json.dumps(payload, ensure_ascii=False, default=str, indent=2).encode("utf-8")
