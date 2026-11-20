@@ -84,7 +84,7 @@ class Connection:
             statement += " RETURNING id"
             auto_id = True
 
-        statement = statement.replace("?", "%s")
+        statement = re.sub(r"INTEGER\\s+PRIMARY\\s+KEY\\s+AUTOINCREMENT", "BIGSERIAL PRIMARY KEY", statement, flags=re.I)\n        statement = re.sub(r"INTEGER\\s+PRIMARY\\s+KEY", "BIGINT PRIMARY KEY", statement, flags=re.I)\n        statement = statement.replace("?", "%s")
         cur = self.raw.execute(statement, params or ())
         lastrowid = None
         if auto_id:
