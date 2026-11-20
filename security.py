@@ -115,7 +115,7 @@ async def monitor_member_change(update, context, owner_id):
     ]])
     try:
         await context.bot.send_message(owner_id,
-            "\\n".join([f"🚨 Anti-Nuke သတိပေးချက်", f"Group: {chat.title} ({chat.id})", f"လုပ်ဆောင်သူ: {actor.full_name} ({actor.id})", f"နောက်ဆုံး ၆၀ စက္ကန့်အတွင်း Member ဖယ်ရှား/ Admin ဖြုတ်မှု {n} ကြိမ်။", "ဆုံးဖြတ်ပါ။"]),
+            chr(10).join([f"🚨 Anti-Nuke သတိပေးချက်", f"Group: {chat.title} ({chat.id})", f"လုပ်ဆောင်သူ: {actor.full_name} ({actor.id})", f"နောက်ဆုံး ၆၀ စက္ကန့်အတွင်း Member ဖယ်ရှား/ Admin ဖြုတ်မှု {n} ကြိမ်။", "ဆုံးဖြတ်ပါ။"]),
             reply_markup=keyboard)
     except Exception:
         pass
