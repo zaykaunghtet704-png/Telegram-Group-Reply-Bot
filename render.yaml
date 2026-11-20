@@ -9,3 +9,5 @@ services:
         sync: false
       - key: OWNER_ID
         value: "7974865879"
+      - key: DATABASE_URL
+        sync: false
