@@ -174,5 +174,6 @@ async def owner_raid_decision(update, context, owner_id):
             c.execute("UPDATE owner_cases SET status='ignored' WHERE id=?", (case_id,))
         result = "🛡️ Owner ဆုံးဖြတ်ချက်အရ Ban မလုပ်ပါ။"
     await q.answer("ဆုံးဖြတ်ချက် ဆောင်ရွက်ပြီးပါပြီ။")
-    await q.edit_message_text((q.message.text or "") + chr(10)*2 + result)
+    keep_buttons = q.message.reply_markup if decision == "ban" and result.startswith("❌") else None
+    await q.edit_message_text((q.message.text or "") + chr(10)*2 + result, reply_markup=keep_buttons)
     return True
