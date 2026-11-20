@@ -96,7 +96,7 @@ class DatabaseAdapterTests(unittest.TestCase):
 
         raw_connections = []
 
-        def make_raw(**kwargs):
+        def make_raw(*args, **kwargs):
             raw = CaptureRaw()
             raw_connections.append(raw)
             return raw
