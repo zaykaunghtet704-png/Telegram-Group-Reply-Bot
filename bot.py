@@ -673,8 +673,8 @@ async def import_sqlite_command(update, context):
         await telegram_file.download_to_drive(custom_path=str(DB_PATH))
         result = migrate_sqlite_once()
         if result.get("status") == "imported":
-            details = "\\n".join(f"{name}: {count}" for name, count in result.get("tables", {}).items())
-            await msg.reply_text("✅ SQLite Data ကို PostgreSQL ထဲ ပြောင်းသွင်းပြီးပါပြီ။\\n" + (details or "Table Data မတွေ့ပါ။"))
+            details = chr(10).join(f"{name}: {count}" for name, count in result.get("tables", {}).items())
+            await msg.reply_text("✅ SQLite Data ကို PostgreSQL ထဲ ပြောင်းသွင်းပြီးပါပြီ။" + chr(10) + (details or "Table Data မတွေ့ပါ။"))
         elif result.get("status") == "already_done":
             await msg.reply_text("ℹ️ SQLite Data ကို အရင်က ပြောင်းသွင်းပြီးသားပါ။")
         else:
