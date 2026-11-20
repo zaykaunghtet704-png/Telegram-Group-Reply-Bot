@@ -904,6 +904,9 @@ async def owner_security_callback(update, context):
 async def post_init(app):
     await app.bot.set_my_commands([
         ("start", "Start bot"),
+        ("ad", "Bot Owner: broadcast an ad"),
+        ("adstats", "Bot Owner: advertising targets"),
+        ("ads", "Manage private ad messages"),
         ("help", "Help and commands"),
         ("panel", "Admin dashboard"),
         ("addreply", "Add keyword reply"),
@@ -943,6 +946,7 @@ def main():
     init_db()
     init_learning_db()
     init_security_db()
+    init_moderation_db()
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ad", owner_ad_command))
