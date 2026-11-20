@@ -15,6 +15,8 @@ Traditional Telegram group keyword auto-reply bot. This is **not an AI chatbot**
 - Flood protection (message burst limit)
 - Welcome and goodbye messages with `{name}` placeholder
 - Optional group conversation learning with fuzzy matching (OFF by default)
+- Group security controls: anti-link and duplicate-message anti-spam (OFF by default)
+- Anti-nuke alerts for repeated member removals/admin demotions, with owner-only Ban / Do not ban decision buttons
 - Admin review/deletion of learned prompt/response pairs
 - Manual database backup with `/backup`
 - Scheduled database backup to the owner when `OWNER_ID` is configured
@@ -47,6 +49,10 @@ Traditional Telegram group keyword auto-reply bot. This is **not an AI chatbot**
 - `/setgroupcooldown 0-3600`
 - `/setflood 0-30` (0 disables)
 - `/setwelcome on|off`
+- `/security on|off` — enable/disable group security checks
+- `/antilink on|off` — delete messages containing common links (requires delete-message permission)
+- `/antispam on|off` — delete repeated identical messages
+- `/setraidlimit 2-20` — alert owner after this many member removals/admin demotions by one actor within 60 seconds
 - `/learn on|off` — toggle conversation learning
 - `/learned` — list learned conversation pairs
 - `/forgetlearned ID` — delete a learned pair
@@ -62,7 +68,7 @@ Commands that change group rules/settings are restricted to group administrators
 - Start command: `python bot.py`
 - Environment variables:
   - `BOT_TOKEN` — token from @BotFather
-  - `OWNER_ID` — optional numeric Telegram owner user ID; enables scheduled backup delivery
+  - `OWNER_ID` — numeric Telegram owner user ID; required for anti-nuke owner alerts and scheduled backup delivery
   - `BACKUP_INTERVAL_HOURS` — optional, defaults to 24
 
 Render provides `PORT` and `RENDER_EXTERNAL_URL` to a Web Service. The app uses Telegram webhook mode.
@@ -71,10 +77,10 @@ Render provides `PORT` and `RENDER_EXTERNAL_URL` to a Web Service. The app uses 
 1. Add the bot to the group.
 2. Disable BotFather privacy mode with `/setprivacy` if it must read ordinary group messages; then remove and re-add the bot if Telegram asks.
 3. Give it permission to send messages and media.
-4. Use a group administrator account to run `/panel` or add reply rules.
+4. Promote the bot to group admin and grant Delete Messages, Ban Users, and Manage Chat permissions as needed. Use a group administrator account to run `/panel` or add reply rules.\n5. Set `OWNER_ID` in Render and start a private chat with the bot using `/start`, so anti-nuke alerts can reach the owner.
 5. To receive automatic backups, set `OWNER_ID` in Render and start a private chat with the bot using `/start`.
 
-## Important storage note
+## Security limitations\n- Telegram does not provide bots with users’ personal profile bio text, so the bot cannot scan or delete a member’s private Bio. It can moderate links and repeated text posted as group messages.\n- Telegram does not provide a general feed of messages deleted by other admins, nor a reliable event for every group description/profile change.\n- Anti-nuke monitoring uses Telegram chat-member updates. The bot must be a group admin and must receive chat-member updates. It detects repeated removals/admin demotions; it cannot undo an action before Telegram reports it.\n- The owner decision button is only sent when `OWNER_ID` is configured and the owner has opened the bot privately. If the suspected actor is still a group admin, Telegram may prevent the bot from banning them; the group creator may need to demote them first.\n- These protections are OFF by default. Enable `/security on`, then `/antilink on` and/or `/antispam on` per group.\n\n## Important storage note
 The database is SQLite at `replies.db`. Render Free Web Services use an ephemeral filesystem, so database contents may be lost after a restart, redeploy, or instance replacement. Use `/backup` regularly and configure `OWNER_ID` for scheduled backups. For reliable permanent storage, move the database to persistent storage or a managed database.
 
 ## Local run
