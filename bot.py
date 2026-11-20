@@ -3,10 +3,10 @@ import asyncio
 import logging
 import os
 import random
-import sqlite3
 import time
 from collections import defaultdict, deque
 from pathlib import Path
+from database import connect as db, DB_PATH, migrate_sqlite_once
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError, RetryAfter, Forbidden
@@ -22,8 +22,6 @@ from learning import (
     delete_learned, clear_pending,
 )
 
-BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "replies.db"
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
 BACKUP_INTERVAL_HOURS = max(1, int(os.getenv("BACKUP_INTERVAL_HOURS", "24")))
@@ -35,12 +33,6 @@ logging.basicConfig(
 logger = logging.getLogger("pro-reply-bot")
 FLOOD_TRACKER = defaultdict(deque)
 GROUP_LAST_REPLY = defaultdict(float)
-
-
-def db():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def init_db():
@@ -947,6 +939,8 @@ def main():
     init_learning_db()
     init_security_db()
     init_moderation_db()
+    migration = migrate_sqlite_once()
+    logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ad", owner_ad_command))
