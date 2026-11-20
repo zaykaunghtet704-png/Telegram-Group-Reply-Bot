@@ -6,6 +6,8 @@ from pathlib import Path
 from telegram import Update, ChatPermissions
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes, ApplicationHandlerStop
+from os import getenv
+OWNER_ID = int(getenv("OWNER_ID", "7974865879") or 7974865879)
 
 DB_PATH = Path(__file__).resolve().parent / "replies.db"
 
@@ -88,7 +90,7 @@ async def add_warning(bot, chat_id, user_id, actor_id, reason, settings, display
 
 async def moderate_content(update: Update, context: ContextTypes.DEFAULT_TYPE, owner_id: int):
     msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
-    if not msg or not chat or chat.type not in ("group", "supergroup") or not user or user.is_bot:
+    if not msg or not chat or chat.type not in ("group", "supergroup") or not user or user.is_bot or (owner_id and user.id == owner_id):
         return
     cfg = get_settings(chat.id)
     if not cfg["adult_filter"]:
@@ -130,8 +132,8 @@ async def manual_warn(update, context):
         await msg.reply_text("အသုံးပြုပုံ: User ရဲ့စာကို Reply လုပ်ပြီး /warn အကြောင်းပြချက်")
         return
     target = msg.reply_to_message.from_user
-    if target.is_bot:
-        await msg.reply_text("Bot ကို Warn မပေးနိုင်ပါ။")
+    if target.is_bot or target.id == OWNER_ID:
+        await msg.reply_text("Bot သို့မဟုတ် Bot Owner ကို Warn မပေးနိုင်ပါ။")
         return
     reason = " ".join(context.args).strip() or "Group စည်းကမ်းချိုးဖောက်မှု"
     cfg = get_settings(chat.id)
