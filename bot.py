@@ -461,6 +461,8 @@ async def panel(update, context):
          InlineKeyboardButton("📊 Stats", callback_data="panel:stats")],
         [InlineKeyboardButton("✅ Auto ON", callback_data="panel:on"),
          InlineKeyboardButton("⛔ Auto OFF", callback_data="panel:off")],
+        [InlineKeyboardButton("👋 Welcome ON/OFF", callback_data="panel:welcome"),
+         InlineKeyboardButton("🚪 Goodbye ON/OFF", callback_data="panel:goodbye")],
         [InlineKeyboardButton("⚙️ Settings", callback_data="panel:settings"),
          InlineKeyboardButton("❔ Help", callback_data="panel:help")],
     ]
@@ -504,9 +506,19 @@ async def panel_callback(update, context):
         with db() as conn:
             n = conn.execute("SELECT COUNT(*) n FROM replies WHERE chat_id=?", (chat.id,)).fetchone()["n"]
         await q.edit_message_text("📊 Reply အရေအတွက်: " + str(n))
+    elif action == "welcome":
+        s = get_settings(chat.id)
+        value = 0 if s["welcome_enabled"] else 1
+        set_setting(chat.id, "welcome_enabled", value)
+        await q.edit_message_text("👋 Welcome: " + ("ON" if value else "OFF"))
+    elif action == "goodbye":
+        s = get_settings(chat.id)
+        value = 0 if s["goodbye_enabled"] else 1
+        set_setting(chat.id, "goodbye_enabled", value)
+        await q.edit_message_text("🚪 Goodbye: " + ("ON" if value else "OFF"))
     elif action == "settings":
         s = get_settings(chat.id)
-        await q.edit_message_text(f'Auto: {s["enabled"]}\nChance: {s["chance"]}%\nCooldown: {s["cooldown"]}\nMatch: {s["match_mode"]}\nLanguage: {s["language"]}')
+        await q.edit_message_text(f'Auto: {s["enabled"]}\nChance: {s["chance"]}%\nUser cooldown: {s["cooldown"]} sec\nGroup cooldown: {s["group_cooldown"]} sec\nFlood limit: {s["flood_limit"]}\nMatch: {s["match_mode"]}\nLanguage: {s["language"]}\nWelcome: {s["welcome_enabled"]}\nGoodbye: {s["goodbye_enabled"]}')
     else:
         await q.edit_message_text("အသုံးပြုနည်းအတွက် /help ကိုနှိပ်ပါ။")
 
