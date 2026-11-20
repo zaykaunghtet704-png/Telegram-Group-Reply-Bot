@@ -12,7 +12,8 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     ContextTypes, ChatMemberHandler, filters,
 )
-from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision, add_blocked_word, list_blocked_words, delete_blocked_word\nfrom moderation import init_moderation_db, get_settings as get_moderation_settings, set_setting as set_moderation_setting, moderate_content, manual_warn, show_warnings, reset_warnings
+from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision, add_blocked_word, list_blocked_words, delete_blocked_word
+from moderation import init_moderation_db, get_settings as get_moderation_settings, set_setting as set_moderation_setting, moderate_content, manual_warn, show_warnings, reset_warnings
 from learning import (
     init_learning_db, get_learning_settings, set_learning_setting,
     record_conversation, find_learned_reply, list_learned,
@@ -217,7 +218,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setraidlimit 3 — Anti-Nuke သတိပေးအဆင့်\n"
         "/addfilterword စာသား — တားမြစ်စာသားထည့်ရန်\n"
         "/listfilterwords — တားမြစ်စာသားစာရင်း\n"
-        "/delfilterword ID — တားမြစ်စာသားဖျက်ရန်\n"\n        "/adultfilter on|off — 18+ စာသား Filter\n"\n        "/warn အကြောင်းပြချက် — Reply လုပ်ထားသူကို Warn\n"\n        "/warns — Warn History ကြည့်ရန်\n"\n        "/resetwarn — Warn အားလုံးရှင်းရန်\n"\n        "/setwarnlimit 3 — Warn အများဆုံးအရေအတွက်\n"\n        "/setwarnaction mute|kick|ban — Warn ပြည့်လျှင် အရေးယူမှု\n"
+        "/delfilterword ID — တားမြစ်စာသားဖျက်ရန်\n"
+        "/adultfilter on|off — 18+ စာသား Filter\n"\n        "/warn အကြောင်းပြချက် — Reply လုပ်ထားသူကို Warn\n"\n        "/warns — Warn History ကြည့်ရန်\n"\n        "/resetwarn — Warn အားလုံးရှင်းရန်\n"\n        "/setwarnlimit 3 — Warn အများဆုံးအရေအတွက်\n"\n        "/setwarnaction mute|kick|ban — Warn ပြည့်လျှင် အရေးယူမှု\n"
         "/learned — သင်ယူထားသော စကားတွဲကြည့်ရန်\n"
         "/forgetlearned ID — သင်ယူထားသော စကားတွဲဖျက်ရန်\n"
         "/setlearnthreshold 50-95 — တူညီမှုအဆင့် သတ်မှတ်ရန်\n"
@@ -849,7 +851,8 @@ def main():
     app.add_handler(CommandHandler("setflood", set_flood))
     app.add_handler(CommandHandler("setwelcome", set_welcome))
     app.add_handler(CommandHandler("setgoodbye", set_goodbye))
-    app.add_handler(CommandHandler("adultfilter", adult_filter_command))\n    app.add_handler(CommandHandler("warn", warn_command))\n    app.add_handler(CommandHandler("warns", warns_command))\n    app.add_handler(CommandHandler("resetwarn", reset_warn_command))\n    app.add_handler(CommandHandler("setwarnlimit", set_warn_limit_command))\n    app.add_handler(CommandHandler("setwarnaction", set_warn_action_command))\n    app.add_handler(CommandHandler("security", security_command))
+    app.add_handler(CommandHandler("adultfilter", adult_filter_command))
+    app.add_handler(CommandHandler("warn", warn_command))\n    app.add_handler(CommandHandler("warns", warns_command))\n    app.add_handler(CommandHandler("resetwarn", reset_warn_command))\n    app.add_handler(CommandHandler("setwarnlimit", set_warn_limit_command))\n    app.add_handler(CommandHandler("setwarnaction", set_warn_action_command))\n    app.add_handler(CommandHandler("security", security_command))
     app.add_handler(CommandHandler("antilink", antilink_command))
     app.add_handler(CommandHandler("antispam", antispam_command))
     app.add_handler(CommandHandler("setraidlimit", set_raid_limit_command))
