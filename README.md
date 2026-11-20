@@ -88,3 +88,15 @@ The database is SQLite at `replies.db`. Render Free Web Services use an ephemera
 
 ## Local run
 Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, and run `python bot.py` only in an environment that also provides `RENDER_EXTERNAL_URL`; this project is currently configured for Render webhook deployment.
+
+
+## Content moderation and warnings
+- `/adultfilter on|off` — delete messages/captions matching the built-in 18+ text keyword list (OFF by default).
+- `/warn` — reply to a member's message with an optional reason to add a warning.
+- `/warns` — show the warning history for yourself, or reply to a member to view theirs.
+- `/resetwarn` — clear active warnings for yourself, or reply to a member to clear theirs.
+- `/setwarnlimit 2-20` — set the warning threshold (default 3).
+- `/setwarnaction mute|kick|ban` — choose the automatic action after the threshold (default mute for 60 minutes).
+- Automated 18+ text detections are logged to the configured owner where private messages are available.
+- The built-in filter checks text and captions only. It does not visually classify image/video content and may miss obfuscated wording or produce false positives. Admins are exempt.
+- The bot needs Delete Messages permission for deletion and Restrict Members / Ban Users permission for escalation.
