@@ -42,8 +42,14 @@ def set_security(chat_id,key,value):
         c.execute(f"UPDATE security_settings SET {key}=? WHERE chat_id=?",(value,chat_id))
 
 def contains_link(text):
-    if not text: return False
-    return bool(re.search(r"(https?://|www\\.|t\\.me/|telegram\\.me/|\\b[a-z0-9-]+\\.(com|net|org|io|me|xyz|site|online|info)\\b)",text,re.I))
+    if not text:
+        return False
+    lowered = text.casefold()
+    markers = ("http://", "https://", "www.", "t.me/", "telegram.me/")
+    if any(marker in lowered for marker in markers):
+        return True
+    endings = (".com", ".net", ".org", ".io", ".me", ".xyz", ".site", ".online", ".info")
+    return any(token.rstrip(".,!?)]}") .endswith(endings) for token in lowered.split())
 
 def is_admin_member(member):
     return member.status in ("administrator", "creator")
@@ -109,7 +115,7 @@ async def monitor_member_change(update, context, owner_id):
     ]])
     try:
         await context.bot.send_message(owner_id,
-            f"🚨 Anti-Nuke သတိပေးချက်\\nGroup: {chat.title} ({chat.id})\\nလုပ်ဆောင်သူ: {actor.full_name} ({actor.id})\\nနောက်ဆုံး ၆၀ စက္ကန့်အတွင်း Member ဖယ်ရှား/ Admin ဖြုတ်မှု {n} ကြိမ်။\\nဆုံးဖြတ်ပါ။",
+            "\\n".join([f"🚨 Anti-Nuke သတိပေးချက်", f"Group: {chat.title} ({chat.id})", f"လုပ်ဆောင်သူ: {actor.full_name} ({actor.id})", f"နောက်ဆုံး ၆၀ စက္ကန့်အတွင်း Member ဖယ်ရှား/ Admin ဖြုတ်မှု {n} ကြိမ်။", "ဆုံးဖြတ်ပါ။"]),
             reply_markup=keyboard)
     except Exception:
         pass
@@ -134,5 +140,5 @@ async def owner_raid_decision(update, context, owner_id):
     else:
         result="🛡️ Owner ဆုံးဖြတ်ချက်အရ Ban မလုပ်ပါ။"
     await q.answer("ဆုံးဖြတ်ချက် သိမ်းပြီးပါပြီ။")
-    await q.edit_message_text((q.message.text or "")+"\\n\\n"+result)
+    await q.edit_message_text((q.message.text or "")+chr(10)*2+result)
     return True
