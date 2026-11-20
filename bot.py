@@ -10,8 +10,9 @@ from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ContextTypes, filters,
+    ContextTypes, ChatMemberHandler, filters,
 )
+from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision
 from learning import (
     init_learning_db, get_learning_settings, set_learning_setting,
     record_conversation, find_learned_reply, list_learned,
@@ -210,6 +211,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setwelcome on|off — Welcome\n"
         "/setgoodbye on|off — Goodbye\n"
         "/learn on|off — Group စကားမှ သင်ယူမှု ဖွင့်/ပိတ်ရန်\n"
+        "/security on|off — Group Security ဖွင့်/ပိတ်ရန်\n"
+        "/antilink on|off — Link ဖျက်ခြင်း\n"
+        "/antispam on|off — ထပ်ခါထပ်ခါစာ ဖျက်ခြင်း\n"
+        "/setraidlimit 3 — Anti-Nuke သတိပေးအဆင့်\n"
         "/learned — သင်ယူထားသော စကားတွဲကြည့်ရန်\n"
         "/forgetlearned ID — သင်ယူထားသော စကားတွဲဖျက်ရန်\n"
         "/setlearnthreshold 50-95 — တူညီမှုအဆင့် သတ်မှတ်ရန်\n"
@@ -686,6 +691,44 @@ async def handle_text(update, context):
     except Exception:
         logger.exception("Auto reply failed")
 
+
+async def security_command(update, context):
+    if not await require_admin(update, context): return
+    if not context.args or context.args[0].lower() not in ("on","off"):
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /security on|off")
+        return
+    value=int(context.args[0].lower()=="on")
+    set_security(update.effective_chat.id,"enabled",value)
+    await update.effective_message.reply_text("🛡️ Group Security ဖွင့်ပြီးပါပြီ။" if value else "Group Security ပိတ်ပြီးပါပြီ။")
+
+async def antilink_command(update, context):
+    if not await require_admin(update, context): return
+    if not context.args or context.args[0].lower() not in ("on","off"):
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /antilink on|off"); return
+    value=int(context.args[0].lower()=="on")
+    set_security(update.effective_chat.id,"anti_link",value)
+    await update.effective_message.reply_text("🔗 Anti-Link ပြင်ဆင်ပြီးပါပြီ။")
+
+async def antispam_command(update, context):
+    if not await require_admin(update, context): return
+    if not context.args or context.args[0].lower() not in ("on","off"):
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /antispam on|off"); return
+    value=int(context.args[0].lower()=="on")
+    set_security(update.effective_chat.id,"anti_spam",value)
+    await update.effective_message.reply_text("🚫 Anti-Spam ပြင်ဆင်ပြီးပါပြီ။")
+
+async def set_raid_limit_command(update, context):
+    if not await require_admin(update, context): return
+    if not context.args or not context.args[0].isdigit() or not 2 <= int(context.args[0]) <= 20:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /setraidlimit 3 (2-20 ကြိမ်/60 စက္ကန့်)"); return
+    set_security(update.effective_chat.id,"raid_limit",int(context.args[0]))
+    await update.effective_message.reply_text("🚨 Anti-Nuke သတိပေးအဆင့် ပြင်ပြီးပါပြီ။")
+
+async def owner_security_callback(update, context):
+    handled=await owner_raid_decision(update,context,OWNER_ID)
+    if not handled:
+        await update.callback_query.answer()
+
 async def post_init(app):
     await app.bot.set_my_commands([
         ("start", "Start bot"),
@@ -720,6 +763,7 @@ def main():
         raise RuntimeError("RENDER_EXTERNAL_URL is missing. Deploy this bot as a Render Web Service.")
     init_db()
     init_learning_db()
+    init_security_db()
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
@@ -738,6 +782,10 @@ def main():
     app.add_handler(CommandHandler("setflood", set_flood))
     app.add_handler(CommandHandler("setwelcome", set_welcome))
     app.add_handler(CommandHandler("setgoodbye", set_goodbye))
+    app.add_handler(CommandHandler("security", security_command))
+    app.add_handler(CommandHandler("antilink", antilink_command))
+    app.add_handler(CommandHandler("antispam", antispam_command))
+    app.add_handler(CommandHandler("setraidlimit", set_raid_limit_command))
     app.add_handler(CommandHandler("learn", set_learning))
     app.add_handler(CommandHandler("learned", learned_list_command))
     app.add_handler(CommandHandler("forgetlearned", forget_learned_command))
@@ -745,7 +793,10 @@ def main():
     app.add_handler(CommandHandler("replysettings", reply_settings))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("backup", backup))
+    app.add_handler(CallbackQueryHandler(owner_security_callback, pattern=r"^raid:"))
     app.add_handler(CallbackQueryHandler(panel_callback, pattern=r"^panel:"))
+    app.add_handler(ChatMemberHandler(lambda u, ctx: monitor_member_change(u, ctx, OWNER_ID), ChatMemberHandler.CHAT_MEMBER))
+    app.add_handler(MessageHandler((filters.TEXT & ~filters.COMMAND) | filters.CAPTION, lambda u, ctx: moderate_message(u, ctx, OWNER_ID), block=False), group=-1)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, member_update))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
