@@ -120,8 +120,8 @@ class Connection:
         )
         statement = re.sub(r"\bINTEGER\b", "BIGINT", statement, flags=re.I)
         statement = re.sub(
-            r"(TEXT[ ]+NOT[ ]+NULL[ ]+DEFAULT)[ ]+CURRENT_TIMESTAMP\\b",
-            r"\\1 CURRENT_TIMESTAMP::text",
+            r"(TEXT[ ]+NOT[ ]+NULL[ ]+DEFAULT)[ ]+CURRENT_TIMESTAMP\b",
+            r"\1 CURRENT_TIMESTAMP::text",
             statement,
             flags=re.I,
         )
