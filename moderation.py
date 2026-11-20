@@ -1,7 +1,6 @@
 import re
-import sqlite3
 import time
-from pathlib import Path
+from database import connect
 
 from telegram import Update, ChatPermissions
 from telegram.error import TelegramError
@@ -9,7 +8,6 @@ from telegram.ext import ContextTypes, ApplicationHandlerStop
 from os import getenv
 OWNER_ID = int(getenv("OWNER_ID", "7974865879") or 7974865879)
 
-DB_PATH = Path(__file__).resolve().parent / "replies.db"
 
 # Text-only keyword screening. Image/video classification is intentionally not claimed.
 ADULT_PATTERNS = [
@@ -19,11 +17,6 @@ ADULT_PATTERNS = [
     r"အဝတ်မပါ", r"ကိုယ်လုံးတီး",
 ]
 COMPILED_ADULT = [re.compile(p, re.IGNORECASE) for p in ADULT_PATTERNS]
-
-def connect():
-    c = sqlite3.connect(DB_PATH, timeout=30)
-    c.row_factory = sqlite3.Row
-    return c
 
 def init_moderation_db():
     with connect() as c:
