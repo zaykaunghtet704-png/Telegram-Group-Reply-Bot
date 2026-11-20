@@ -19,7 +19,7 @@ def init_security_db():
             chat_id INTEGER PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0,
             anti_link INTEGER NOT NULL DEFAULT 0, anti_spam INTEGER NOT NULL DEFAULT 0,
             raid_limit INTEGER NOT NULL DEFAULT 3)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS raid_actions(
+        c.execute("""CREATE TABLE IF NOT EXISTS blocked_words(\n            id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER NOT NULL, word TEXT NOT NULL,\n            UNIQUE(chat_id,word))""")\n        c.execute("""CREATE TABLE IF NOT EXISTS raid_actions(
             id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER NOT NULL,
             actor_id INTEGER NOT NULL, target_id INTEGER NOT NULL,
             action TEXT NOT NULL, created_at REAL NOT NULL)""")
@@ -40,6 +40,23 @@ def set_security(chat_id,key,value):
     with _db() as c:
         c.execute("INSERT OR IGNORE INTO security_settings(chat_id) VALUES(?)",(chat_id,))
         c.execute(f"UPDATE security_settings SET {key}=? WHERE chat_id=?",(value,chat_id))
+
+def add_blocked_word(chat_id, word):
+    word = word.strip().casefold()
+    if not word or len(word) > 100:
+        return False
+    with _db() as c:
+        cur = c.execute("INSERT OR IGNORE INTO blocked_words(chat_id,word) VALUES(?,?)",(chat_id,word))
+        return cur.rowcount > 0
+
+def list_blocked_words(chat_id):
+    with _db() as c:
+        return [dict(row) for row in c.execute("SELECT id,word FROM blocked_words WHERE chat_id=? ORDER BY id",(chat_id,)).fetchall()]
+
+def delete_blocked_word(chat_id, word_id):
+    with _db() as c:
+        cur = c.execute("DELETE FROM blocked_words WHERE chat_id=? AND id=?",(chat_id,word_id))
+        return cur.rowcount > 0
 
 def contains_link(text):
     if not text:
@@ -70,6 +87,11 @@ async def moderate_message(update, context, owner_id):
     text=msg.text or msg.caption or ""
     reason=None
     if cfg["anti_link"] and contains_link(text): reason="Link ခွင့်မပြုပါ"
+    if text:
+        with _db() as c:
+            words=[row["word"] for row in c.execute("SELECT word FROM blocked_words WHERE chat_id=?",(chat.id,)).fetchall()]
+        matched=next((word for word in words if word and word in text.casefold()),None)
+        if matched: reason="ခွင့်မပြုထားသော စာသား ပါဝင်နေပါသည်"
     if cfg["anti_spam"]:
         now=time.time(); key=(chat.id,user.id); q=SPAM_WINDOW[key]
         while q and now-q[0][0]>12: q.popleft()
