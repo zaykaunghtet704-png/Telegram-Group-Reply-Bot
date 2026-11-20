@@ -4,6 +4,7 @@ import os
 import random
 import sqlite3
 import time
+from collections import defaultdict, deque
 from pathlib import Path
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -23,6 +24,8 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger("pro-reply-bot")
+FLOOD_TRACKER = defaultdict(deque)
+GROUP_LAST_REPLY = defaultdict(float)
 
 
 def db():
@@ -39,7 +42,13 @@ def init_db():
             chance INTEGER NOT NULL DEFAULT 100,
             cooldown INTEGER NOT NULL DEFAULT 3,
             match_mode TEXT NOT NULL DEFAULT 'contains',
-            language TEXT NOT NULL DEFAULT 'both'
+            language TEXT NOT NULL DEFAULT 'both',
+            group_cooldown INTEGER NOT NULL DEFAULT 0,
+            flood_limit INTEGER NOT NULL DEFAULT 0,
+            welcome_enabled INTEGER NOT NULL DEFAULT 1,
+            goodbye_enabled INTEGER NOT NULL DEFAULT 0,
+            welcome_text TEXT NOT NULL DEFAULT 'မင်္ဂလာပါ {name}။ Group မှ ကြိုဆိုပါတယ်။',
+            goodbye_text TEXT NOT NULL DEFAULT '{name} Group မှ ထွက်ခွာသွားပါပြီ။'
         )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS replies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,6 +58,8 @@ def init_db():
             media_type TEXT NOT NULL DEFAULT 'text',
             file_id TEXT NOT NULL DEFAULT '',
             caption TEXT NOT NULL DEFAULT '',
+            priority INTEGER NOT NULL DEFAULT 0,
+            hits INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS usage (
@@ -57,6 +68,19 @@ def init_db():
             last_reply REAL NOT NULL DEFAULT 0,
             PRIMARY KEY(chat_id, user_id)
         )""")
+        for table, column, definition in [
+            ("settings", "group_cooldown", "INTEGER NOT NULL DEFAULT 0"),
+            ("settings", "flood_limit", "INTEGER NOT NULL DEFAULT 0"),
+            ("settings", "welcome_enabled", "INTEGER NOT NULL DEFAULT 1"),
+            ("settings", "goodbye_enabled", "INTEGER NOT NULL DEFAULT 0"),
+            ("settings", "welcome_text", "TEXT NOT NULL DEFAULT 'မင်္ဂလာပါ {name}။ Group မှ ကြိုဆိုပါတယ်။'"),
+            ("settings", "goodbye_text", "TEXT NOT NULL DEFAULT '{name} Group မှ ထွက်ခွာသွားပါပြီ။'"),
+            ("replies", "priority", "INTEGER NOT NULL DEFAULT 0"),
+            ("replies", "hits", "INTEGER NOT NULL DEFAULT 0"),
+        ]:
+            columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            if column not in columns:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_replies_chat ON replies(chat_id)")
 
 
@@ -68,7 +92,7 @@ def get_settings(chat_id):
 
 
 def set_setting(chat_id, key, value):
-    allowed = {"enabled", "chance", "cooldown", "match_mode", "language"}
+    allowed = {"enabled", "chance", "cooldown", "match_mode", "language", "group_cooldown", "flood_limit", "welcome_enabled", "goodbye_enabled", "welcome_text", "goodbye_text"}
     if key not in allowed:
         raise ValueError("Invalid setting")
     with db() as conn:
@@ -175,6 +199,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setchance 0-100 — Reply ဖြစ်နိုင်ခြေ\n"
         "/setcooldown 0-3600 — User တစ်ယောက်ချင်းစီ စောင့်ချိန်\n"
         "/setlang my|en|both — ဘာသာစကား\n"
+        "/setpriority ID | -100..100 — ဦးစားပေးမှု\n"
+        "/setgroupcooldown 0-3600 — Group စောင့်ချိန်\n"
+        "/setflood 0-30 — Flood ကာကွယ်မှု\n"
+        "/setwelcome on|off — Welcome\n"
+        "/setgoodbye on|off — Goodbye\n"
         "/replysettings — Setting ကြည့်ရန်\n"
         "/stats — စာရင်းအင်း\n"
         "/backup — Database Backup ယူရန်\n\n"
@@ -329,6 +358,79 @@ async def set_lang(update, context):
     await update.effective_message.reply_text("🌐 Language setting saved.")
 
 
+async def set_priority(update, context):
+    if not await require_admin(update, context):
+        return
+    raw = update.effective_message.text.partition(" ")[2].strip()
+    if "|" not in raw:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /setpriority 5 | 20")
+        return
+    left, right = (x.strip() for x in raw.split("|", 1))
+    if not left.isdigit() or not right.lstrip("-").isdigit() or not -100 <= int(right) <= 100:
+        await update.effective_message.reply_text("ID မှန်ကန်စွာထည့်ပြီး Priority ကို -100 မှ 100 အတွင်းထားပါ။")
+        return
+    with db() as conn:
+        cur = conn.execute("UPDATE replies SET priority=? WHERE id=? AND chat_id=?", (int(right), int(left), update.effective_chat.id))
+    await update.effective_message.reply_text("⭐ Priority ပြောင်းပြီးပါပြီ။" if cur.rowcount else "ဒီ ID ကို မတွေ့ပါဘူး။")
+
+
+async def set_group_cooldown(update, context):
+    if not await require_admin(update, context):
+        return
+    if not context.args or not context.args[0].isdigit() or not 0 <= int(context.args[0]) <= 3600:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /setgroupcooldown 10 (0-3600)")
+        return
+    set_setting(update.effective_chat.id, "group_cooldown", int(context.args[0]))
+    await update.effective_message.reply_text("⏱️ Group Cooldown သတ်မှတ်ပြီးပါပြီ။")
+
+
+async def set_flood(update, context):
+    if not await require_admin(update, context):
+        return
+    if not context.args or not context.args[0].isdigit() or not 0 <= int(context.args[0]) <= 30:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /setflood 6 (0=OFF၊ 1-30)")
+        return
+    set_setting(update.effective_chat.id, "flood_limit", int(context.args[0]))
+    await update.effective_message.reply_text("🛡️ Flood protection ပြင်ဆင်ပြီးပါပြီ။")
+
+
+async def set_welcome(update, context):
+    if not await require_admin(update, context):
+        return
+    if not context.args or context.args[0].lower() not in ("on", "off"):
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /setwelcome on|off")
+        return
+    enabled = int(context.args[0].lower() == "on")
+    set_setting(update.effective_chat.id, "welcome_enabled", enabled)
+    await update.effective_message.reply_text("👋 Welcome ဖွင့်ပြီးပါပြီ။" if enabled else "Welcome ပိတ်ပြီးပါပြီ။")
+
+
+async def set_goodbye(update, context):
+    if not await require_admin(update, context):
+        return
+    if not context.args or context.args[0].lower() not in ("on", "off"):
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /setgoodbye on|off")
+        return
+    enabled = int(context.args[0].lower() == "on")
+    set_setting(update.effective_chat.id, "goodbye_enabled", enabled)
+    await update.effective_message.reply_text("👋 Goodbye ဖွင့်ပြီးပါပြီ။" if enabled else "Goodbye ပိတ်ပြီးပါပြီ။")
+
+
+async def member_update(update, context):
+    msg = update.effective_message
+    if not msg or not is_group(update.effective_chat):
+        return
+    s = get_settings(update.effective_chat.id)
+    if msg.new_chat_members and s["welcome_enabled"]:
+        for member in msg.new_chat_members:
+            if not member.is_bot:
+                text = s["welcome_text"].replace("{name}", member.full_name)
+                await msg.reply_text(text)
+    if msg.left_chat_member and s["goodbye_enabled"] and not msg.left_chat_member.is_bot:
+        text = s["goodbye_text"].replace("{name}", msg.left_chat_member.full_name)
+        await msg.reply_text(text)
+
+
 async def reply_settings(update, context):
     if not await require_admin(update, context):
         return
@@ -447,7 +549,18 @@ async def handle_text(update, context):
         last = conn.execute("SELECT last_reply FROM usage WHERE chat_id=? AND user_id=?", (chat.id, user.id)).fetchone()
         if last and now - last["last_reply"] < s["cooldown"]:
             return
-        rows = conn.execute("SELECT * FROM replies WHERE chat_id=?", (chat.id,)).fetchall()
+        rows = conn.execute("SELECT * FROM replies WHERE chat_id=? ORDER BY priority DESC,id DESC", (chat.id,)).fetchall()
+    limit = int(s.get("flood_limit", 0))
+    if limit:
+        queue = FLOOD_TRACKER[(chat.id, user.id)]
+        while queue and now - queue[0] > 8:
+            queue.popleft()
+        queue.append(now)
+        if len(queue) > limit:
+            return
+    group_cd = int(s.get("group_cooldown", 0))
+    if group_cd and now - GROUP_LAST_REPLY[chat.id] < group_cd:
+        return
     incoming = msg.text.casefold().strip()
     matches = []
     for row in rows:
@@ -467,7 +580,9 @@ async def handle_text(update, context):
     selected = random.choice(matches)
     try:
         await send_reply(msg, selected)
+        GROUP_LAST_REPLY[chat.id] = now
         with db() as conn:
+            conn.execute("UPDATE replies SET hits=hits+1 WHERE id=?", (selected["id"],))
             conn.execute(
                 "INSERT INTO usage(chat_id,user_id,last_reply) VALUES(?,?,?) "
                 "ON CONFLICT(chat_id,user_id) DO UPDATE SET last_reply=excluded.last_reply",
@@ -514,10 +629,16 @@ def main():
     app.add_handler(CommandHandler("setchance", set_chance))
     app.add_handler(CommandHandler("setcooldown", set_cooldown))
     app.add_handler(CommandHandler("setlang", set_lang))
+    app.add_handler(CommandHandler("setpriority", set_priority))
+    app.add_handler(CommandHandler("setgroupcooldown", set_group_cooldown))
+    app.add_handler(CommandHandler("setflood", set_flood))
+    app.add_handler(CommandHandler("setwelcome", set_welcome))
+    app.add_handler(CommandHandler("setgoodbye", set_goodbye))
     app.add_handler(CommandHandler("replysettings", reply_settings))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CallbackQueryHandler(panel_callback, pattern=r"^panel:"))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, member_update))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     webhook_path = hashlib.sha256(BOT_TOKEN.encode("utf-8")).hexdigest()
