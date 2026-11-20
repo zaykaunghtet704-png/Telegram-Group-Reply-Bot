@@ -1,17 +1,7 @@
 import re
-import sqlite3
 import time
 from difflib import SequenceMatcher
-from pathlib import Path
-
-DB_PATH = Path(__file__).resolve().parent / "replies.db"
-
-
-def _db():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
-    conn.row_factory = sqlite3.Row
-    return conn
-
+from database import connect as _db
 
 def init_learning_db():
     with _db() as conn:
