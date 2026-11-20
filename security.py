@@ -19,7 +19,9 @@ def init_security_db():
             chat_id INTEGER PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0,
             anti_link INTEGER NOT NULL DEFAULT 0, anti_spam INTEGER NOT NULL DEFAULT 0,
             raid_limit INTEGER NOT NULL DEFAULT 3)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS blocked_words(\n            id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER NOT NULL, word TEXT NOT NULL,\n            UNIQUE(chat_id,word))""")\n        c.execute("""CREATE TABLE IF NOT EXISTS raid_actions(
+        c.execute("""CREATE TABLE IF NOT EXISTS blocked_words(
+            id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER NOT NULL, word TEXT NOT NULL,
+            UNIQUE(chat_id,word))""")\n        c.execute("""CREATE TABLE IF NOT EXISTS raid_actions(
             id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER NOT NULL,
             actor_id INTEGER NOT NULL, target_id INTEGER NOT NULL,
             action TEXT NOT NULL, created_at REAL NOT NULL)""")
