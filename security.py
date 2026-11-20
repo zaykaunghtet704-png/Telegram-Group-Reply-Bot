@@ -147,23 +147,32 @@ async def monitor_member_change(update, context, owner_id):
 
 async def owner_raid_decision(update, context, owner_id):
     q=update.callback_query
-    if not q or not q.data.startswith("raid:"): return False
-    if not owner_id or q.from_user.id!=owner_id:
-        await q.answer("Bot Owner သာ ဆုံးဖြတ်နိုင်ပါတယ်။",show_alert=True); return True
-    _,decision,raw_id=q.data.split(":")
+    if not q or not q.data.startswith("raid:"):
+        return False
+    if not owner_id or q.from_user.id != owner_id:
+        await q.answer("Bot Owner သာ ဆုံးဖြတ်နိုင်ပါတယ်။", show_alert=True)
+        return True
+    _, decision, raw_id = q.data.split(":")
+    case_id = int(raw_id)
     with _db() as c:
-        case=c.execute("SELECT * FROM owner_cases WHERE id=?",(int(raw_id),)).fetchone()
-        if not case or case["status"]!="pending":
-            await q.answer("ဒီအမှုကို ဆုံးဖြတ်ပြီးပါပြီ။",show_alert=True); return True
-        c.execute("UPDATE owner_cases SET status=? WHERE id=?",("ban" if decision=="ban" else "ignored",int(raw_id)))
-    if decision=="ban":
+        case = c.execute("SELECT * FROM owner_cases WHERE id=?", (case_id,)).fetchone()
+    if not case or case["status"] != "pending":
+        await q.answer("ဒီအမှုကို ဆုံးဖြတ်ပြီးပါပြီ။", show_alert=True)
+        return True
+    if decision == "ban":
         try:
-            await context.bot.ban_chat_member(case["chat_id"],case["actor_id"])
-            result="✅ သံသယရှိသူကို Ban လုပ်ပြီးပါပြီ။"
+            await context.bot.ban_chat_member(case["chat_id"], case["actor_id"])
+            with _db() as c:
+                c.execute("UPDATE owner_cases SET status='ban' WHERE id=?", (case_id,))
+            result = "✅ သံသယရှိသူကို Ban လုပ်ပြီးပါပြီ။"
         except Exception as e:
-            result=f"❌ Ban မအောင်မြင်ပါ။ Bot ကို Admin + Ban permission ပေးထားပါ။ ({type(e).__name__})"
+            result = ("❌ Ban မအောင်မြင်ပါ။ Bot ကို Ban Users permission ပေးပါ။ "
+                      "သံသယရှိသူက Group Admin ဖြစ်နေပါက Group Creator က အရင် Demote လုပ်ရန်လိုနိုင်ပါတယ်။ "
+                      f"({type(e).__name__})")
     else:
-        result="🛡️ Owner ဆုံးဖြတ်ချက်အရ Ban မလုပ်ပါ။"
-    await q.answer("ဆုံးဖြတ်ချက် သိမ်းပြီးပါပြီ။")
-    await q.edit_message_text((q.message.text or "")+chr(10)*2+result)
+        with _db() as c:
+            c.execute("UPDATE owner_cases SET status='ignored' WHERE id=?", (case_id,))
+        result = "🛡️ Owner ဆုံးဖြတ်ချက်အရ Ban မလုပ်ပါ။"
+    await q.answer("ဆုံးဖြတ်ချက် ဆောင်ရွက်ပြီးပါပြီ။")
+    await q.edit_message_text((q.message.text or "") + chr(10)*2 + result)
     return True
