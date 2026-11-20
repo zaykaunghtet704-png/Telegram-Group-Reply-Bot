@@ -10,7 +10,10 @@ Traditional Telegram group keyword auto-reply bot. This is **not an AI chatbot**
 - Text, photo, GIF/animation, video, sticker, voice, audio and document replies
 - Admin-only Telegram dashboard with inline buttons
 - Add, edit, delete and list replies
-- Enable/disable, reply chance, per-user cooldown and language setting
+- Enable/disable, reply chance, per-user and group cooldown, language setting
+- Per-rule priority (higher priority rules are checked first)
+- Flood protection (message burst limit)
+- Welcome and goodbye messages with `{name}` placeholder
 - Manual database backup with `/backup`
 - Scheduled database backup to the owner when `OWNER_ID` is configured
 - Render Web Service webhook deployment
@@ -28,6 +31,11 @@ Traditional Telegram group keyword auto-reply bot. This is **not an AI chatbot**
 - `/setchance 0-100`
 - `/setcooldown 0-3600`
 - `/setlang my|en|both`
+- `/setpriority ID | -100..100`
+- `/setgroupcooldown 0-3600`
+- `/setflood 0-30` (0 disables)
+- `/setwelcome on|off`
+- `/setgoodbye on|off`
 - `/replysettings`, `/stats`, `/backup`
 
 Commands that change group rules/settings are restricted to group administrators (or the configured owner).
