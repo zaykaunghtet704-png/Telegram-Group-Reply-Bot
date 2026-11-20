@@ -3,7 +3,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-from telegram import Update
+from telegram import Update, ChatPermissions
 from telegram.constants import ChatMemberStatus
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes, ApplicationHandlerStop
@@ -54,7 +54,7 @@ def set_setting(chat_id, key, value):
         c.execute(f"UPDATE moderation_settings SET {key}=? WHERE chat_id=?", (value, chat_id))
 
 def is_admin(member):
-    return member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER, "administrator", "creator")
+    return member.status in ("administrator", "creator")
 
 def count_warnings(chat_id, user_id):
     with connect() as c:
@@ -80,7 +80,7 @@ async def add_warning(bot, chat_id, user_id, actor_id, reason, settings, display
             else:
                 until = int(time.time()) + int(settings["mute_seconds"])
                 await bot.restrict_chat_member(chat_id, user_id,
-                    permissions=__import__("telegram").ChatPermissions(can_send_messages=False),
+                    permissions=ChatPermissions(can_send_messages=False),
                     until_date=until)
                 action_result = f'Warn ပြည့်သဖြင့် {int(settings["mute_seconds"]) // 60} မိနစ် Mute လုပ်ပြီးပါပြီ။'
         except TelegramError as exc:
