@@ -4,7 +4,6 @@ import time
 from pathlib import Path
 
 from telegram import Update, ChatPermissions
-from telegram.constants import ChatMemberStatus
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes, ApplicationHandlerStop
 
