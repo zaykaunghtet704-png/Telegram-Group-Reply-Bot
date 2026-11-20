@@ -238,13 +238,13 @@ async def owner_ad_command(update, context):
     with db() as conn:
         groups = [r["chat_id"] for r in conn.execute("SELECT chat_id FROM known_groups WHERE active=1").fetchall()]
         users = [r["user_id"] for r in conn.execute("SELECT user_id FROM known_users WHERE ads_enabled=1").fetchall()]
-    targets = groups if target == "groups" else users if target == "users" else groups + users
+    targets = [("group", x) for x in groups] if target == "groups" else [("user", x) for x in users] if target == "users" else [("group", x) for x in groups] + [("user", x) for x in users]
     if not targets:
         await msg.reply_text("ပို့ရန် Group/User မရှိသေးပါ။")
         return
     status = await msg.reply_text(f"📢 ကြော်ငြာပို့နေပါပြီ။\nTarget: {target}\nစုစုပေါင်း: {len(targets)}")
     sent = failed = 0
-    for chat_id in targets:
+    for kind, chat_id in targets:
         try:
             await context.bot.copy_message(chat_id=chat_id, from_chat_id=source.chat_id, message_id=source.message_id)
             sent += 1
@@ -257,7 +257,7 @@ async def owner_ad_command(update, context):
                 failed += 1
         except (Forbidden, TelegramError):
             failed += 1
-            if target in ("groups", "all"):
+            if kind == "group":
                 with db() as conn: conn.execute("UPDATE known_groups SET active=0 WHERE chat_id=?", (chat_id,))
             else:
                 with db() as conn: conn.execute("UPDATE known_users SET ads_enabled=0 WHERE user_id=?", (chat_id,))
