@@ -46,6 +46,7 @@ async def owner_command(update, context, owner_id):
          InlineKeyboardButton("👥 Groups", callback_data="owner:groups")],
         [InlineKeyboardButton("👤 Users", callback_data="owner:users"),
          InlineKeyboardButton("🚫 Ban List", callback_data="owner:bans")],
+        [InlineKeyboardButton("💘 Relationship", callback_data="owner:love")],
         [InlineKeyboardButton("🛠 Maintenance", callback_data="owner:maintenance"),
          InlineKeyboardButton("📜 Action Logs", callback_data="owner:logs")],
     ]
@@ -78,6 +79,14 @@ async def owner_callback(update, context, owner_id):
         elif key == "owner:bans":
             rows = conn.execute("SELECT user_id,reason FROM owner_bans WHERE active=1 ORDER BY created_at DESC LIMIT 30").fetchall()
             text = "🚫 ACTIVE BOT BANS\n" + ("\n".join(f"{r['user_id']} — {r['reason']}" for r in rows) or "Ban မရှိပါ။")
+        elif key == "owner:love":
+            profiles = conn.execute("SELECT COUNT(*) AS n FROM love_profiles WHERE active=1").fetchone()["n"]
+            published = conn.execute("SELECT COUNT(*) AS n FROM love_profiles WHERE active=1 AND approved=1 AND consent_publish=1").fetchone()["n"]
+            reports = conn.execute("SELECT COUNT(*) AS n FROM love_reports WHERE status='open'").fetchone()["n"]
+            channels = conn.execute("SELECT COUNT(*) AS n FROM love_channels").fetchone()["n"]
+            groups = conn.execute("SELECT COUNT(*) AS n FROM love_group_settings WHERE enabled=1").fetchone()["n"]
+            dms = conn.execute("SELECT COUNT(*) AS n FROM love_dm_subscribers WHERE enabled=1").fetchone()["n"]
+            text = f"💘 RELATIONSHIP CONTROL\\nProfiles: {profiles}\\nPublished/approved: {published}\\nOpen reports: {reports}\\nRequired channels: {channels}\\nOpt-in groups: {groups}\\nOpt-in DMs: {dms}\\n\\nManage channels: /lovechannel\\nReview reports: /lovereports"
         elif key == "owner:maintenance":
             row = conn.execute("SELECT setting_value FROM owner_settings WHERE setting_key='maintenance'").fetchone()
             current = row["setting_value"] if row else "off"
