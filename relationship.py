@@ -237,6 +237,15 @@ async def publish_command(update, context):
     if update.effective_chat.type != "private":
         await msg.reply_text("🔒 /lovepublish ကို Bot Private Chat မှာ သုံးပါ။")
         return
+    channels = await _required_channels(context.bot)
+    if not channels:
+        await msg.reply_text("⛔ Bot Owner က Required Channel မသတ်မှတ်ရသေးပါ။")
+        return
+    with connect() as conn:
+        consent = conn.execute("SELECT consent_publish FROM love_profiles WHERE user_id=? AND active=1", (user.id,)).fetchone()
+    if not consent or not consent["consent_publish"]:
+        await msg.reply_text("Profile Post မတင်မီ /love မှာ Profile ဖြည့်ပြီး ဖြန့်ဝေမှုကို သဘောတူပါ။")
+        return
     joined, missing = await _joined_all(context.bot, user.id)
     if not joined:
         channels = await _required_channels(context.bot)
@@ -249,7 +258,7 @@ async def publish_command(update, context):
                              reply_markup=InlineKeyboardMarkup(buttons) if buttons else None)
         return
     with connect() as conn:
-        conn.execute("UPDATE love_profiles SET consent_publish=1,approved=1,updated_at=? WHERE user_id=? AND active=1",
+        conn.execute("UPDATE love_profiles SET approved=1,updated_at=? WHERE user_id=? AND active=1",
                      (time.time(),user.id))
         row = conn.execute("SELECT consent_publish FROM love_profiles WHERE user_id=? AND active=1", (user.id,)).fetchone()
     if not row:
@@ -264,10 +273,16 @@ async def channel_admin_command(update, context):
     if not user or user.id != OWNER_ID:
         await msg.reply_text("⛔ Bot Owner သာ Channel များ သတ်မှတ်နိုင်ပါတယ်။")
         return
-    if len(context.args) < 2 or context.args[0].lower() not in ("add","remove"):
+    if not context.args or context.args[0].lower() not in ("add","remove","list"):
         await msg.reply_text("အသုံးပြုပုံ:\n/lovechannel add @channelusername\n/lovechannel remove @channelusername\n/lovechannel list")
         return
     action = context.args[0].lower()
+    if action == "list":
+        await channel_list_command(update, context)
+        return
+    if len(context.args) < 2:
+        await msg.reply_text("Channel @username ထည့်ပါ။")
+        return
     target = context.args[1]
     if action == "add":
         try:
@@ -364,7 +379,7 @@ async def love_callback(update, context):
     data=q.data or ""
     if data=="love:profile":
         await q.answer()
-        await profile_start(update,context)
+        await q.message.reply_text("Profile ဖြည့်ရန် Private Chat မှာ /loveprofile ကို ပို့ပါ။")
         return
     if data=="love:publish":
         await q.answer()
@@ -399,8 +414,11 @@ async def love_callback(update, context):
         await q.edit_message_text("Profile ကို မတင်တော့ပါ။")
         return
     if data=="love:consent":
-        await q.answer()
-        await q.edit_message_text("သဘောတူညီမှု သိမ်းပြီးပါပြီ။ Channel Join စစ်ဆေးပြီး /lovepublish နှိပ်ပါ။")
+        with connect() as conn:
+            conn.execute("UPDATE love_profiles SET consent_publish=1,updated_at=? WHERE user_id=? AND active=1",
+                         (time.time(),user.id))
+        await q.answer("သဘောတူညီမှု သိမ်းပြီးပါပြီ။")
+        await q.edit_message_text("သဘောတူညီမှု သိမ်းပြီးပါပြီ။ သတ်မှတ် Channel Join ပြီး /lovepublish နှိပ်ပါ။")
         return
     parts=data.split(":")
     if len(parts)!=3:
