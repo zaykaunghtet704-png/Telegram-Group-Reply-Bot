@@ -17,6 +17,7 @@ from telegram.ext import (
 )
 from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision, add_blocked_word, list_blocked_words, delete_blocked_word
 from moderation import init_moderation_db, get_settings as get_moderation_settings, set_setting as set_moderation_setting, moderate_content, manual_warn, show_warnings, reset_warnings
+from group_features import init_group_features, set_rules_command, rules_command, lock_command, unlock_command
 from member_features import (
     init_member_features, track_member_activity, id_command, profile_command,
     afk_command, check_afk_mention, note_command, notes_command,
@@ -343,7 +344,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/afk အကြောင်းပြချက် — AFK ဖွင့်ရန်\n"
         "/note စာသား — ကိုယ်ပိုင်မှတ်စုသိမ်းရန်\n"
         "/notes — မှတ်စုစာရင်း\n"
-        "/delnote ID — မှတ်စုဖျက်ရန်\n\n"
+        "/delnote ID — မှတ်စုဖျက်ရန်\n"
+        "/setrules စည်းကမ်း — Group စည်းကမ်းသတ်မှတ်ရန် (Admin)\n"
+        "/rules — Group စည်းကမ်းကြည့်ရန်\n"
+        "/lock — Group စာပို့ခွင့်ပိတ်ရန် (Admin)\n"
+        "/unlock — Group စာပို့ခွင့်ဖွင့်ရန် (Admin)\n\n"
         "Keyword ပါဝင်တဲ့ Group စာကို Bot က သတ်မှတ်ထားတဲ့ Reply ဖြင့် ပြန်ဖြေပါမယ်။"
     )
     await update.effective_message.reply_text(text)
@@ -1058,6 +1063,10 @@ async def post_init(app):
         ("delnote", "Delete one of your notes"),
         ("reports", "Admin: review open reports"),
         ("closereport", "Admin: close a report"),
+        ("setrules", "Admin: set group rules"),
+        ("rules", "Show group rules"),
+        ("lock", "Admin: lock group messages"),
+        ("unlock", "Admin: unlock group messages"),
     ])
     if OWNER_ID:
         app.job_queue.run_repeating(
@@ -1079,6 +1088,7 @@ def main():
     init_security_db()
     init_moderation_db()
     init_member_features()
+    init_group_features()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
@@ -1092,6 +1102,10 @@ def main():
     app.add_handler(CommandHandler("note", note_command))
     app.add_handler(CommandHandler("notes", notes_command))
     app.add_handler(CommandHandler("delnote", delnote_command))
+    app.add_handler(CommandHandler("setrules", set_rules_command))
+    app.add_handler(CommandHandler("rules", rules_command))
+    app.add_handler(CommandHandler("lock", lock_command))
+    app.add_handler(CommandHandler("unlock", unlock_command))
     app.add_handler(CommandHandler("ad", owner_ad_command))
     app.add_handler(CommandHandler("adstats", owner_ad_stats))
     app.add_handler(CommandHandler("ads", ads_command))
