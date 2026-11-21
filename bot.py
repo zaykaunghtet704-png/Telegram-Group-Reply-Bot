@@ -301,6 +301,17 @@ async def ads_command(update, context):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "🤖 PRO Reply Bot Ultimate X — Commands\n\n"
+        "Relationship (18+) Commands:\n"
+        "/love — Relationship Menu\n"
+        "/loveprofile — Profile ထည့်/ပြင် (Private Chat)\n"
+        "/lovepublish — Join စစ်ပြီး Profile Post တင်ရန်\n"
+        "/lovesearch — Profile ရှာရန်\n"
+        "/loveposts on|off — Group Post လက်ခံမှု (Admin)\n"
+        "/lovedm on|off — DM Post လက်ခံမှု\n"
+        "/loveblock USER_ID /loveunblock USER_ID — Block/Unblock\n"
+        "/lovedeleteposts — ကိုယ့် Post များဖျက်ရန်\n"
+        "/lovechannel add|remove|list — Owner Channel စီမံရန်\n"
+        "/lovereports — Owner Report စာရင်း\n\n"
         "Group Admin Commands:\n"
         "/panel — Dashboard ဖွင့်ရန်\n"
         "/addreply keyword | reply — စာသား Reply ထည့်ရန်\n"
@@ -1039,6 +1050,12 @@ async def post_init(app):
         ("lovesearch", "Find relationship profiles"),
         ("loveposts", "Group relationship post opt-in"),
         ("lovedm", "Relationship DM opt-in"),
+        ("loveblock", "Block a relationship profile"),
+        ("loveunblock", "Unblock a relationship profile"),
+        ("lovedeleteposts", "Delete your relationship posts"),
+        ("lovechannel", "Owner: configure required channels"),
+        ("lovechannels", "Owner: list required channels"),
+        ("lovereports", "Owner: review relationship reports"),
         ("importsqlite", "Bot Owner: import old SQLite backup"),
         ("ad", "Bot Owner: broadcast an ad"),
         ("adstats", "Bot Owner: advertising targets"),
