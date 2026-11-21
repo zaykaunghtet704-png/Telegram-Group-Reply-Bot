@@ -53,7 +53,8 @@ def similarity(left, right):
     return SequenceMatcher(None, a, b, autojunk=False).ratio()
 
 
-def record_conversation(chat_id, user_id, message_text):
+def record_conversation(chat_id, user_id, message_text, reply_to_user_id=None):
+    """Learn only from an explicit Telegram reply to the previous user's message."""
     text = message_text.strip()
     if len(text) < 3 or len(text) > 1000:
         return
@@ -63,7 +64,10 @@ def record_conversation(chat_id, user_id, message_text):
             "SELECT user_id,message_text,created_at FROM learn_pending WHERE chat_id=?",
             (chat_id,),
         ).fetchone()
-        if previous and previous["user_id"] != user_id and now - previous["created_at"] <= 90:
+        if (previous and reply_to_user_id is not None
+                and previous["user_id"] == reply_to_user_id
+                and previous["user_id"] != user_id
+                and now - previous["created_at"] <= 300):
             prompt = previous["message_text"].strip()
             if len(prompt) >= 3 and normalize_text(prompt) != normalize_text(text):
                 conn.execute(
