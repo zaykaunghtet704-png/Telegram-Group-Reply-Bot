@@ -552,6 +552,57 @@ async def member_update(update, context):
         text = s["goodbye_text"].replace("{name}", msg.left_chat_member.full_name)
         await msg.reply_text(text)
 
+async def bot_membership_update(update, context):
+    """Notify only the configured Bot Owner when this bot joins or is promoted."""
+    change = update.my_chat_member
+    if not change or not OWNER_ID:
+        return
+    chat = change.chat
+    if not is_group(chat):
+        return
+    old_status = change.old_chat_member.status
+    new_status = change.new_chat_member.status
+    if new_status not in ("member", "administrator") or old_status not in ("left", "kicked"):
+        return
+
+    actor = change.from_user
+    bot_member = change.new_chat_member
+    admin_text = "Admin" if new_status == "administrator" else "Admin မဟုတ်သေးပါ"
+    group_link = "မရနိုင်သေးပါ (Private Group သို့မဟုတ် Link မရနိုင်)"
+    try:
+        if chat.username:
+            group_link = "https://t.me/" + chat.username
+        elif new_status == "administrator":
+            invite = await context.bot.create_chat_invite_link(chat.id, name="Bot Owner group notice")
+            group_link = invite.invite_link
+    except TelegramError:
+        pass
+
+    creator_text = "မရနိုင်သေးပါ"
+    try:
+        admins = await context.bot.get_chat_administrators(chat.id)
+        creator = next((m.user for m in admins if m.status == "creator"), None)
+        if creator:
+            creator_text = f"{creator.full_name} (ID: {creator.id})"
+    except TelegramError:
+        pass
+
+    actor_text = f"{actor.full_name} (ID: {actor.id})" if actor else "မသိရှိနိုင်ပါ"
+    message = (
+        "🆕 Bot ကို Group အသစ်ထဲ ထည့်သွင်းလိုက်ပါပြီ။\\n\\n"
+        f"📌 Group: {chat.title or 'Unknown'}\\n"
+        f"🆔 Group ID: {chat.id}\\n"
+        f"🔗 Group Link: {group_link}\\n"
+        f"👑 Group Owner: {creator_text}\\n"
+        f"➕ Bot ထည့်သူ: {actor_text}\\n"
+        f"🤖 Bot Status: {admin_text}\\n\\n"
+        "ဤအသိပေးချက်ကို Bot Owner ထံသို့သာ ပို့ထားပါသည်။"
+    )
+    try:
+        await context.bot.send_message(chat_id=OWNER_ID, text=message, disable_web_page_preview=True)
+    except TelegramError:
+        logger.exception("Could not notify Bot Owner about new group")
+
 
 async def reply_settings(update, context):
     if not await require_admin(update, context):
@@ -800,7 +851,11 @@ async def handle_text(update, context):
                         )
                     clear_pending(chat.id)
                     return
-            record_conversation(chat.id, user.id, msg.text)
+            replied_user = msg.reply_to_message.from_user if msg.reply_to_message else None
+            record_conversation(
+                chat.id, user.id, msg.text,
+                reply_to_user_id=(replied_user.id if replied_user else None),
+            )
         except Exception:
             logger.exception("Conversation learning failed")
     if not s["enabled"] or random.randint(1, 100) > s["chance"]:
@@ -821,20 +876,29 @@ async def handle_text(update, context):
     group_cd = int(s.get("group_cooldown", 0))
     if group_cd and now - GROUP_LAST_REPLY[chat.id] < group_cd:
         return
-    incoming = msg.text.casefold().strip()
+    incoming = " ".join(msg.text.casefold().split())
     matches = []
     for row in rows:
-        key = row["keyword"].casefold().strip()
+        key = " ".join(row["keyword"].casefold().split())
         if not key:
             continue
         mode = s["match_mode"]
-        matched = incoming == key if mode == "exact" else incoming.startswith(key) if mode == "startswith" else key in incoming
+        if mode == "exact":
+            matched = incoming == key
+            score = 10000 + len(key) if matched else -1
+        elif mode == "startswith":
+            matched = incoming.startswith(key)
+            score = 5000 + len(key) if matched else -1
+        else:
+            # Whole phrase matching prevents short fragments matching inside unrelated words.
+            matched = key in incoming
+            score = 1000 + len(key) if matched else -1
         if matched:
-            matches.append(row)
+            matches.append((int(row["priority"]), score, -int(row["id"]), row))
     if not matches:
         return
-    highest_priority = max(row["priority"] for row in matches)
-    selected = random.choice([row for row in matches if row["priority"] == highest_priority])
+    # Highest priority first; then strongest/most specific keyword; stable ID breaks ties.
+    selected = max(matches, key=lambda item: item[:3])[3]
     try:
         await send_reply(msg, selected)
         GROUP_LAST_REPLY[chat.id] = now
@@ -1038,6 +1102,7 @@ def main():
     app.add_handler(CallbackQueryHandler(owner_security_callback, pattern=r"^raid:"))
     app.add_handler(CallbackQueryHandler(panel_callback, pattern=r"^panel:"))
     app.add_handler(ChatMemberHandler(lambda u, ctx: monitor_member_change(u, ctx, OWNER_ID), ChatMemberHandler.CHAT_MEMBER))
+    app.add_handler(ChatMemberHandler(bot_membership_update, ChatMemberHandler.MY_CHAT_MEMBER))
     app.add_handler(MessageHandler((filters.TEXT & ~filters.COMMAND) | filters.CAPTION, lambda u, ctx: moderate_content(u, ctx, OWNER_ID)), group=-2)
     app.add_handler(MessageHandler((filters.TEXT & ~filters.COMMAND) | filters.CAPTION, lambda u, ctx: moderate_message(u, ctx, OWNER_ID), block=False), group=-1)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, member_update))
