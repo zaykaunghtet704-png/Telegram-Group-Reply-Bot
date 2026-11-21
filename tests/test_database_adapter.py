@@ -7,6 +7,7 @@ import security
 import moderation
 import learning
 import member_features
+import group_features
 from database import Connection
 
 
@@ -109,6 +110,7 @@ class DatabaseAdapterTests(unittest.TestCase):
             security.init_security_db()
             moderation.init_moderation_db()
             member_features.init_member_features()
+            group_features.init_group_features()
 
         statements = [
             sql
