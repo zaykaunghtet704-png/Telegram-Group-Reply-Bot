@@ -10,7 +10,7 @@ from telegram.ext import (
 from database import connect
 
 AGE, GENDER, CITY, LOOKING_FOR, BIO, PHOTO = range(6)
-OWNER_ID = int(os.getenv("OWNER_ID", "0") or 0)
+OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
 
 
 def init_relationship():
@@ -79,7 +79,7 @@ async def profile_start(update, context):
         me = await context.bot.get_me()
         await update.effective_message.reply_text(
             f"🔒 ကိုယ်ရေးအချက်အလက် လုံခြုံရေးအတွက် Private Chat မှာ ဖြည့်ပါ။\n"
-            f"https://t.me/{me.username}?start=loveprofile"
+            f"https://t.me/{me.username} ကိုဖွင့်ပြီး /loveprofile ပို့ပါ။"
         )
         return ConversationHandler.END
     await update.effective_message.reply_text("အသက် ဘယ်နှစ်နှစ်ရှိပြီလဲ။ (18+ သာ)\nပယ်ဖျက်ရန် /cancel")
@@ -467,6 +467,16 @@ async def block_command(update, context):
     await update.effective_message.reply_text("🚫 Block လုပ်ပြီးပါပြီ။")
 
 
+async def unblock_command(update, context):
+    if not context.args or not context.args[0].isdigit():
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /loveunblock USER_ID")
+        return
+    target = int(context.args[0])
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM love_blocks WHERE blocker_id=? AND blocked_id=?", (_user(update).id,target))
+    await update.effective_message.reply_text("Block ဖြုတ်ပြီးပါပြီ။" if cur.rowcount else "ဒီ User ကို Block မလုပ်ထားပါ။")
+
+
 async def report_list_command(update, context):
     user=_user(update)
     if not user or user.id!=OWNER_ID:
@@ -501,6 +511,7 @@ def relationship_handlers():
         CommandHandler("loveposts", group_optin_command),
         CommandHandler("lovedm", dm_optin_command),
         CommandHandler("loveblock", block_command),
+        CommandHandler("loveunblock", unblock_command),
         CommandHandler("lovereports", report_list_command),
         CallbackQueryHandler(love_callback, pattern=r"^love:"),
     ]
