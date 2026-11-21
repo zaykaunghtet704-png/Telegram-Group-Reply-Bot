@@ -6,6 +6,7 @@ import bot
 import security
 import moderation
 import learning
+import member_features
 from database import Connection
 
 
@@ -107,6 +108,7 @@ class DatabaseAdapterTests(unittest.TestCase):
             learning.init_learning_db()
             security.init_security_db()
             moderation.init_moderation_db()
+            member_features.init_member_features()
 
         statements = [
             sql
