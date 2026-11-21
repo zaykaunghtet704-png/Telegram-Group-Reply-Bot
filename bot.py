@@ -392,6 +392,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setflood 0-30 — Flood ကာကွယ်မှု\n"
         "/setwelcome on|off — Welcome\n"
         "/setgoodbye on|off — Goodbye\n"
+        "/setwelcometext စာသား — Welcome စာသားပြင်ရန်\\n"
+        "/setgoodbyetext စာသား — Goodbye စာသားပြင်ရန်\\n"
+        "/welcomepreview / /goodbyepreview — Preview ကြည့်ရန်\\n"
+        "/resetwelcome / /resetgoodbye — မူလစာသားပြန်ထားရန်\\n"
         "/learn on|off — Group စကားမှ သင်ယူမှု ဖွင့်/ပိတ်ရန်\n"
         "/security on|off — Group Security ဖွင့်/ပိတ်ရန်\n"
         "/antilink on|off — Link ဖျက်ခြင်း\n"
@@ -631,22 +635,105 @@ async def set_goodbye(update, context):
         return
     enabled = int(context.args[0].lower() == "on")
     set_setting(update.effective_chat.id, "goodbye_enabled", enabled)
-    await update.effective_message.reply_text("👋 Goodbye ဖွင့်ပြီးပါပြီ။" if enabled else "Goodbye ပိတ်ပြီးပါပြီ။")
+    await update.effective_message.reply_text("🚪 Goodbye ဖွင့်ပြီးပါပြီ။" if enabled else "🚪 Goodbye ပိတ်ပြီးပါပြီ။")
+
+
+DEFAULT_WELCOME_TEXT = "🎉 မင်္ဂလာပါ {name} ရေ!\n💖 {chat} မှ နွေးထွေးစွာ ကြိုဆိုပါတယ်။\n👥 အဖွဲ့ဝင်အမှတ်: {count}\n📌 စည်းကမ်းများကို လိုက်နာပေးပါနော်။"
+DEFAULT_GOODBYE_TEXT = "👋 {name} တစ်ယောက် Group မှ ထွက်ခွာသွားပါပြီ။\n💬 ပြန်လာချင်တဲ့အခါ တံခါးဖွင့်ထားပါတယ်။\n👥 ကျန်ရှိသူ: {count} ဦး"
+
+
+def render_member_message(template, member, chat, count):
+    username = ("@" + member.username) if getattr(member, "username", None) else "မရှိပါ"
+    values = {
+        "{name}": member.full_name or "မသိရှိသူ",
+        "{username}": username,
+        "{id}": str(member.id),
+        "{chat}": chat.title or "Group",
+        "{count}": str(max(0, count)),
+    }
+    result = template or ""
+    for key, value in values.items():
+        result = result.replace(key, value)
+    return result[:4000]
+
+
+async def set_member_message_text(update, context, kind):
+    if not await require_admin(update, context):
+        return
+    msg = update.effective_message
+    value = msg.text.partition(" ")[2].strip()
+    if not value:
+        command = "/setwelcometext" if kind == "welcome" else "/setgoodbyetext"
+        await msg.reply_text(
+            f"အသုံးပြုပုံ: {command} သင့်စာသား\n\n"
+            "အသုံးပြုနိုင်သော အစားထိုးစာလုံးများ:\n"
+            "{name} — ဝင်လာ/ထွက်သွားသူအမည်\n"
+            "{username} — Telegram Username\n"
+            "{id} — User ID\n"
+            "{chat} — Group အမည်\n"
+            "{count} — လက်ရှိ Member အရေအတွက်\n\n"
+            "စာသားပြင်ရန် Command နောက်မှာ စာသားရေးပို့ပါ။"
+        )
+        return
+    if len(value) > 3500:
+        await msg.reply_text("စာသားသည် ၃၅၀၀ စာလုံးထက် မကျော်ရပါ။")
+        return
+    column = "welcome_text" if kind == "welcome" else "goodbye_text"
+    set_setting(update.effective_chat.id, column, value)
+    await msg.reply_text(
+        ("🎉 Welcome" if kind == "welcome" else "🚪 Goodbye")
+        + " စာသားအသစ်ကို သိမ်းပြီးပါပြီ။\n"
+        + "စမ်းကြည့်ရန်: /" + ("welcomepreview" if kind == "welcome" else "goodbyepreview")
+    )
+
+
+async def preview_member_message(update, context, kind):
+    if not await require_admin(update, context):
+        return
+    chat = update.effective_chat
+    user = update.effective_user
+    settings = get_settings(chat.id)
+    column = "welcome_text" if kind == "welcome" else "goodbye_text"
+    sample_count = 101 if kind == "welcome" else 100
+    rendered = render_member_message(settings[column], user, chat, sample_count)
+    await update.effective_message.reply_text(
+        ("🎉 Welcome Preview\\n\\n" if kind == "welcome" else "🚪 Goodbye Preview\\n\\n")
+        + rendered
+    )
+
+
+async def reset_member_message_text(update, context, kind):
+    if not await require_admin(update, context):
+        return
+    column = "welcome_text" if kind == "welcome" else "goodbye_text"
+    default = DEFAULT_WELCOME_TEXT if kind == "welcome" else DEFAULT_GOODBYE_TEXT
+    set_setting(update.effective_chat.id, column, default)
+    await update.effective_message.reply_text("✅ မူလစာသားကို ပြန်ထားပြီးပါပြီ။")
 
 
 async def member_update(update, context):
     msg = update.effective_message
-    if not msg or not is_group(update.effective_chat):
+    chat = update.effective_chat
+    if not msg or not is_group(chat):
         return
-    s = get_settings(update.effective_chat.id)
-    if msg.new_chat_members and s["welcome_enabled"]:
+    settings = get_settings(chat.id)
+    if msg.new_chat_members and settings["welcome_enabled"]:
         for member in msg.new_chat_members:
             if not member.is_bot:
-                text = s["welcome_text"].replace("{name}", member.full_name)
-                await msg.reply_text(text)
-    if msg.left_chat_member and s["goodbye_enabled"] and not msg.left_chat_member.is_bot:
-        text = s["goodbye_text"].replace("{name}", msg.left_chat_member.full_name)
-        await msg.reply_text(text)
+                try:
+                    count = await context.bot.get_chat_member_count(chat.id)
+                except TelegramError:
+                    count = 0
+                rendered = render_member_message(settings["welcome_text"], member, chat, count)
+                await msg.reply_text(rendered)
+    if msg.left_chat_member and settings["goodbye_enabled"] and not msg.left_chat_member.is_bot:
+        try:
+            count = await context.bot.get_chat_member_count(chat.id)
+        except TelegramError:
+            count = 0
+        rendered = render_member_message(settings["goodbye_text"], msg.left_chat_member, chat, count)
+        await msg.reply_text(rendered)
+
 
 async def bot_membership_update(update, context):
     """Notify only the configured Bot Owner when this bot joins or is promoted."""
@@ -1222,6 +1309,12 @@ def main():
     app.add_handler(CommandHandler("setflood", set_flood))
     app.add_handler(CommandHandler("setwelcome", set_welcome))
     app.add_handler(CommandHandler("setgoodbye", set_goodbye))
+    app.add_handler(CommandHandler("setwelcometext", lambda u, ctx: set_member_message_text(u, ctx, "welcome")))
+    app.add_handler(CommandHandler("setgoodbyetext", lambda u, ctx: set_member_message_text(u, ctx, "goodbye")))
+    app.add_handler(CommandHandler("welcomepreview", lambda u, ctx: preview_member_message(u, ctx, "welcome")))
+    app.add_handler(CommandHandler("goodbyepreview", lambda u, ctx: preview_member_message(u, ctx, "goodbye")))
+    app.add_handler(CommandHandler("resetwelcome", lambda u, ctx: reset_member_message_text(u, ctx, "welcome")))
+    app.add_handler(CommandHandler("resetgoodbye", lambda u, ctx: reset_member_message_text(u, ctx, "goodbye")))
     app.add_handler(CommandHandler("adultfilter", adult_filter_command))
     app.add_handler(CommandHandler("warn", warn_command))
     app.add_handler(CommandHandler("warns", warns_command))
