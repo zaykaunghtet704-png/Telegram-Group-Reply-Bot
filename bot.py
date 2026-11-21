@@ -17,6 +17,11 @@ from telegram.ext import (
 )
 from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision, add_blocked_word, list_blocked_words, delete_blocked_word
 from moderation import init_moderation_db, get_settings as get_moderation_settings, set_setting as set_moderation_setting, moderate_content, manual_warn, show_warnings, reset_warnings
+from member_features import (
+    init_member_features, track_member_activity, id_command, profile_command,
+    afk_command, check_afk_mention, note_command, notes_command,
+    delnote_command, report_command,
+)
 from learning import (
     init_learning_db, get_learning_settings, set_learning_setting,
     record_conversation, find_learned_reply, list_learned,
@@ -214,6 +219,7 @@ def register_seen_update(update):
 
 async def track_chats(update, context):
     register_seen_update(update)
+    track_member_activity(update)
 
 async def owner_ad_command(update, context):
     user, msg = update.effective_user, update.effective_message
@@ -1034,6 +1040,13 @@ async def post_init(app):
         ("learned", "List learned conversations"),
         ("forgetlearned", "Delete learned pair"),
         ("setlearnthreshold", "Set learning similarity"),
+        ("id", "Show Telegram IDs"),
+        ("profile", "Show member profile"),
+        ("report", "Report a message to group admins"),
+        ("afk", "Set AFK status"),
+        ("note", "Save a group note"),
+        ("notes", "List your saved notes"),
+        ("delnote", "Delete one of your notes"),
     ])
     if OWNER_ID:
         app.job_queue.run_repeating(
@@ -1054,14 +1067,23 @@ def main():
     init_learning_db()
     init_security_db()
     init_moderation_db()
+    init_member_features()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("id", id_command))
+    app.add_handler(CommandHandler("profile", profile_command))
+    app.add_handler(CommandHandler("report", report_command))
+    app.add_handler(CommandHandler("afk", afk_command))
+    app.add_handler(CommandHandler("note", note_command))
+    app.add_handler(CommandHandler("notes", notes_command))
+    app.add_handler(CommandHandler("delnote", delnote_command))
     app.add_handler(CommandHandler("ad", owner_ad_command))
     app.add_handler(CommandHandler("adstats", owner_ad_stats))
     app.add_handler(CommandHandler("ads", ads_command))
     app.add_handler(MessageHandler(filters.ALL, track_chats), group=-10)
+    app.add_handler(MessageHandler(filters.ALL, check_afk_mention), group=-9)
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("panel", panel))
     app.add_handler(CommandHandler("addreply", add_reply))
