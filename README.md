@@ -157,3 +157,16 @@ If the dashboard service is not created automatically, open Render Blueprint →
 - `/lovereports` — Bot Owner reviews profile reports.
 
 Profile details are stored in PostgreSQL. Group and DM distribution is opt-in; users must start the bot before receiving DMs. The bot never publishes a phone number or Telegram username in the profile card. Configure required public channels and grant the bot administrator permissions before enabling publishing.
+
+
+## Custom Welcome & Goodbye Messages
+
+Group admins can customize both messages independently. Settings are stored in PostgreSQL and survive restarts.
+
+- `/setwelcome on|off` and `/setgoodbye on|off` — toggle each message.
+- `/setwelcometext your message` — customize the join message.
+- `/setgoodbyetext your message` — customize the leave message.
+- `/welcomepreview` and `/goodbyepreview` — preview with sample member details.
+- `/resetwelcome` and `/resetgoodbye` — restore the built-in default text.
+
+Placeholders: `{name}` (member name), `{username}` (Telegram username), `{id}` (Telegram user ID), `{chat}` (group title), and `{count}` (current member count). Messages are plain text and can contain emoji and line breaks. Maximum custom message length: 3,500 characters.
