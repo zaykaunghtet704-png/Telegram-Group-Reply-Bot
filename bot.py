@@ -392,10 +392,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setflood 0-30 — Flood ကာကွယ်မှု\n"
         "/setwelcome on|off — Welcome\n"
         "/setgoodbye on|off — Goodbye\n"
-        "/setwelcometext စာသား — Welcome စာသားပြင်ရန်\\n"
-        "/setgoodbyetext စာသား — Goodbye စာသားပြင်ရန်\\n"
-        "/welcomepreview / /goodbyepreview — Preview ကြည့်ရန်\\n"
-        "/resetwelcome / /resetgoodbye — မူလစာသားပြန်ထားရန်\\n"
+        "/setwelcometext စာသား — Welcome စာသားပြင်ရန်\n"
+        "/setgoodbyetext စာသား — Goodbye စာသားပြင်ရန်\n"
+        "/welcomepreview / /goodbyepreview — Preview ကြည့်ရန်\n"
+        "/resetwelcome / /resetgoodbye — မူလစာသားပြန်ထားရန်\n"
         "/learn on|off — Group စကားမှ သင်ယူမှု ဖွင့်/ပိတ်ရန်\n"
         "/security on|off — Group Security ဖွင့်/ပိတ်ရန်\n"
         "/antilink on|off — Link ဖျက်ခြင်း\n"
@@ -697,7 +697,7 @@ async def preview_member_message(update, context, kind):
     sample_count = 101 if kind == "welcome" else 100
     rendered = render_member_message(settings[column], user, chat, sample_count)
     await update.effective_message.reply_text(
-        ("🎉 Welcome Preview\\n\\n" if kind == "welcome" else "🚪 Goodbye Preview\\n\\n")
+        ("🎉 Welcome Preview\n\n" if kind == "welcome" else "🚪 Goodbye Preview\n\n")
         + rendered
     )
 
