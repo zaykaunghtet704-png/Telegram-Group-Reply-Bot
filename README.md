@@ -6,7 +6,7 @@ Traditional Telegram group keyword auto-reply bot. This is **not an AI chatbot**
 - Myanmar and English command/help text
 - Per-group SQLite reply rules and settings
 - Keyword matching: `contains`, `exact`, `startswith`
-- Random selection when multiple rules match
+- Deterministic keyword matching: priority first, then exact/longer match specificity
 - Text, photo, GIF/animation, video, sticker, voice, audio and document replies
 - Admin-only Telegram dashboard with inline buttons
 - Add, edit, delete and list replies
@@ -25,7 +25,7 @@ Traditional Telegram group keyword auto-reply bot. This is **not an AI chatbot**
 ## Conversation Learning Auto Reply
 
 - Admins enable it with `/learn on` and pause it with `/learn off`.
-- When enabled, the bot stores consecutive messages from different group members as prompt/response examples if they arrive within 90 seconds.
+- When enabled, the bot learns only when a member explicitly replies to another member's message; the reply target must match the stored previous message author, and the reply must arrive within five minutes.
 - Later messages are compared with stored prompts using fuzzy text similarity; a reply is sent only when the similarity threshold is met.
 - Default threshold: 72%. Change it with `/setlearnthreshold 72` (allowed: 50-95).
 - Review examples with `/learned`; remove a bad pair with `/forgetlearned ID`.
@@ -84,7 +84,7 @@ Render provides `PORT` and `RENDER_EXTERNAL_URL` to a Web Service. The app uses 
 5. To receive automatic backups, set `OWNER_ID` in Render and start a private chat with the bot using `/start`.
 
 ## Security limitations\n- Telegram does not provide bots with users’ personal profile bio text, so the bot cannot scan or delete a member’s private Bio. It can moderate links and repeated text posted as group messages.\n- Telegram does not provide a general feed of messages deleted by other admins, nor a reliable event for every group description/profile change.\n- Anti-nuke monitoring uses Telegram chat-member updates. The bot must be a group admin and must receive chat-member updates. It detects repeated removals/admin demotions; it cannot undo an action before Telegram reports it.\n- The owner decision button is only sent when `OWNER_ID` is configured and the owner has opened the bot privately. If the suspected actor is still a group admin, Telegram may prevent the bot from banning them; the group creator may need to demote them first.\n- These protections are OFF by default. Enable `/security on`, then `/antilink on` and/or `/antispam on` per group. Add recruitment/scam phrases with `/addfilterword phrase`; the bot deletes group messages containing those phrases.\n\n## Important storage note
-The database is SQLite at `replies.db`. Render Free Web Services use an ephemeral filesystem, so database contents may be lost after a restart, redeploy, or instance replacement. Use `/backup` regularly and configure `OWNER_ID` for scheduled backups. For reliable permanent storage, move the database to persistent storage or a managed database.
+The primary database is PostgreSQL through `DATABASE_URL`. The old `replies.db` is retained as a one-time migration source and is not the live database. Use `/backup` regularly and configure `OWNER_ID` for scheduled PostgreSQL JSON backups. Keep the PostgreSQL database attached to both the bot and dashboard services.
 
 ## Local run
 Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, and run `python bot.py` only in an environment that also provides `RENDER_EXTERNAL_URL`; this project is currently configured for Render webhook deployment.
