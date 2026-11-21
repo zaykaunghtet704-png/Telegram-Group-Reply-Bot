@@ -18,6 +18,7 @@ from telegram.ext import (
 from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision, add_blocked_word, list_blocked_words, delete_blocked_word
 from moderation import init_moderation_db, get_settings as get_moderation_settings, set_setting as set_moderation_setting, moderate_content, manual_warn, show_warnings, reset_warnings
 from group_features import init_group_features, set_rules_command, rules_command, lock_command, unlock_command
+from owner_control import init_owner_control, owner_command, owner_callback
 from member_features import (
     init_member_features, track_member_activity, id_command, profile_command,
     afk_command, check_afk_mention, note_command, notes_command,
@@ -1089,10 +1090,12 @@ def main():
     init_moderation_db()
     init_member_features()
     init_group_features()
+    init_owner_control()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("owner", lambda u, c: owner_command(u, c, OWNER_ID)))
     app.add_handler(CommandHandler("id", id_command))
     app.add_handler(CommandHandler("profile", profile_command))
     app.add_handler(CommandHandler("report", report_command))
@@ -1149,6 +1152,7 @@ def main():
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CommandHandler("importsqlite", import_sqlite_command))
     app.add_handler(CallbackQueryHandler(owner_security_callback, pattern=r"^raid:"))
+    app.add_handler(CallbackQueryHandler(lambda u, c: owner_callback(u, c, OWNER_ID), pattern=r"^owner:"))
     app.add_handler(CallbackQueryHandler(panel_callback, pattern=r"^panel:"))
     app.add_handler(ChatMemberHandler(lambda u, ctx: monitor_member_change(u, ctx, OWNER_ID), ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(ChatMemberHandler(bot_membership_update, ChatMemberHandler.MY_CHAT_MEMBER))
