@@ -9,6 +9,7 @@ import learning
 import member_features
 import group_features
 import owner_control
+import relationship
 from database import Connection
 
 
@@ -113,6 +114,7 @@ class DatabaseAdapterTests(unittest.TestCase):
             member_features.init_member_features()
             group_features.init_group_features()
             owner_control.init_owner_control()
+            relationship.init_relationship()
 
         statements = [
             sql
