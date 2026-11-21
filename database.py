@@ -14,13 +14,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
 SERIAL_TABLES = {
     "replies", "blocked_words", "raid_actions",
-    "owner_cases", "warnings", "learned_pairs",
+    "owner_cases", "warnings", "learned_pairs", "member_notes", "member_reports",
 }
 MIGRATION_TABLES = (
     "settings", "replies", "usage", "known_users", "known_groups",
     "security_settings", "blocked_words", "raid_actions", "owner_cases",
     "moderation_settings", "warnings", "learning_settings", "learned_pairs",
-    "learn_pending",
+    "learn_pending", "member_profiles", "member_notes", "member_reports", "group_rules",
 )
 
 
