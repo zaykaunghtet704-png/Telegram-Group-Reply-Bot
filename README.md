@@ -128,3 +128,16 @@ Member profiles, reports, AFK state and notes are stored in PostgreSQL and survi
 - `/setrules text` — group admins save persistent group rules.
 - `/rules` — members view the saved group rules.
 - `/lock` and `/unlock` — group admins lock/unlock default member messaging permissions (bot needs Restrict Members permission).
+
+## Owner Web Dashboard
+
+A separate Flask dashboard is included at `dashboard.py`. When the Render Blueprint is synced, it defines a second Web Service named `pro-reply-owner-dashboard`.
+
+Set these Environment variables on that dashboard service:
+- `DATABASE_URL` — use the same PostgreSQL Internal Database URL as the bot service.
+- `DASHBOARD_PASSWORD` — create a long, unique password; do not reuse your Telegram or GitHub password.
+- `SECRET_KEY` — generate a long random secret (at least 32 random bytes).
+
+The dashboard provides owner login, group counts, private-user counts, saved reply counts, and per-group Auto Reply ON/OFF controls. It does not expose the Telegram bot token. Use HTTPS on Render and keep the dashboard URL private. The `/health` endpoint is public for hosting health checks; all management pages require the dashboard password.
+
+If the dashboard service is not created automatically, open Render Blueprint → review the new `pro-reply-owner-dashboard` service and create it. Do not change or delete the existing bot service or PostgreSQL database.
