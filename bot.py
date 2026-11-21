@@ -19,6 +19,7 @@ from security import init_security_db, get_security, set_security, moderate_mess
 from moderation import init_moderation_db, get_settings as get_moderation_settings, set_setting as set_moderation_setting, moderate_content, manual_warn, show_warnings, reset_warnings
 from group_features import init_group_features, set_rules_command, rules_command, lock_command, unlock_command
 from owner_control import init_owner_control, owner_command, owner_callback
+from relationship import init_relationship, relationship_handlers
 from member_features import (
     init_member_features, track_member_activity, id_command, profile_command,
     afk_command, check_afk_mention, note_command, notes_command,
@@ -1032,6 +1033,12 @@ async def post_init(app):
     await app.bot.set_my_commands([
         ("start", "Start bot"),
         ("owner", "Bot Owner control center"),
+        ("love", "Relationship system menu"),
+        ("loveprofile", "Create or edit 18+ profile"),
+        ("lovepublish", "Publish your relationship profile"),
+        ("lovesearch", "Find relationship profiles"),
+        ("loveposts", "Group relationship post opt-in"),
+        ("lovedm", "Relationship DM opt-in"),
         ("importsqlite", "Bot Owner: import old SQLite backup"),
         ("ad", "Bot Owner: broadcast an ad"),
         ("adstats", "Bot Owner: advertising targets"),
@@ -1092,11 +1099,14 @@ def main():
     init_member_features()
     init_group_features()
     init_owner_control()
+    init_relationship()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("owner", lambda u, c: owner_command(u, c, OWNER_ID)))
+    for love_handler in relationship_handlers():
+        app.add_handler(love_handler)
     app.add_handler(CommandHandler("id", id_command))
     app.add_handler(CommandHandler("profile", profile_command))
     app.add_handler(CommandHandler("report", report_command))
