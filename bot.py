@@ -20,7 +20,7 @@ from moderation import init_moderation_db, get_settings as get_moderation_settin
 from member_features import (
     init_member_features, track_member_activity, id_command, profile_command,
     afk_command, check_afk_mention, note_command, notes_command,
-    delnote_command, report_command,
+    delnote_command, report_command, reports_command, close_report_command,
 )
 from learning import (
     init_learning_db, get_learning_settings, set_learning_setting,
@@ -334,7 +334,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setlearnthreshold 50-95 — တူညီမှုအဆင့် သတ်မှတ်ရန်\n"
         "/replysettings — Setting ကြည့်ရန်\n"
         "/stats — စာရင်းအင်း\n"
-        "/backup — Database Backup ယူရန်\n\n"
+        "/backup — Database Backup ယူရန်\n"
+        "/id — User ID / Chat ID ကြည့်ရန်\n"
+        "/profile — Member Profile ကြည့်ရန်\n"
+        "/report — Reply လုပ်ထားသောစာကို Admin ထံ တိုင်ကြားရန်\n"
+        "/reports — Admin အတွက် Report စာရင်း\n"
+        "/closereport ID — Report ပိတ်ရန်\n"
+        "/afk အကြောင်းပြချက် — AFK ဖွင့်ရန်\n"
+        "/note စာသား — ကိုယ်ပိုင်မှတ်စုသိမ်းရန်\n"
+        "/notes — မှတ်စုစာရင်း\n"
+        "/delnote ID — မှတ်စုဖျက်ရန်\n\n"
         "Keyword ပါဝင်တဲ့ Group စာကို Bot က သတ်မှတ်ထားတဲ့ Reply ဖြင့် ပြန်ဖြေပါမယ်။"
     )
     await update.effective_message.reply_text(text)
@@ -1047,6 +1056,8 @@ async def post_init(app):
         ("note", "Save a group note"),
         ("notes", "List your saved notes"),
         ("delnote", "Delete one of your notes"),
+        ("reports", "Admin: review open reports"),
+        ("closereport", "Admin: close a report"),
     ])
     if OWNER_ID:
         app.job_queue.run_repeating(
@@ -1075,6 +1086,8 @@ def main():
     app.add_handler(CommandHandler("id", id_command))
     app.add_handler(CommandHandler("profile", profile_command))
     app.add_handler(CommandHandler("report", report_command))
+    app.add_handler(CommandHandler("reports", reports_command))
+    app.add_handler(CommandHandler("closereport", close_report_command))
     app.add_handler(CommandHandler("afk", afk_command))
     app.add_handler(CommandHandler("note", note_command))
     app.add_handler(CommandHandler("notes", notes_command))
