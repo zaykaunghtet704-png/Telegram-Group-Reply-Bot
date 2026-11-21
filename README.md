@@ -141,3 +141,19 @@ Set these Environment variables on that dashboard service:
 The dashboard provides owner login, group counts, private-user counts, saved reply counts, and per-group Auto Reply ON/OFF controls. It does not expose the Telegram bot token. Use HTTPS on Render and keep the dashboard URL private. The `/health` endpoint is public for hosting health checks; all management pages require the dashboard password.
 
 If the dashboard service is not created automatically, open Render Blueprint → review the new `pro-reply-owner-dashboard` service and create it. Do not change or delete the existing bot service or PostgreSQL database.
+
+
+## Relationship System (18+)
+
+- `/love` — Relationship menu.
+- `/loveprofile` — Create/edit a profile in private chat (age 18+).
+- `/lovepublish` — Publish after joining every Bot Owner-required channel and explicitly consenting.
+- `/lovesearch` — Browse an active profile and Like/Report.
+- `/loveposts on|off` — Group admins opt a group into relationship posts.
+- `/lovedm on|off` — Users opt in/out of receiving profile posts by DM.
+- `/lovedeleteposts` — Remove the user's recorded published posts and deactivate the profile.
+- `/lovechannel add @channel`, `/lovechannel remove @channel`, `/lovechannel list` — Bot Owner manages required channels (bot must be a channel admin).
+- `/loveblock USER_ID` — Block a profile.
+- `/lovereports` — Bot Owner reviews profile reports.
+
+Profile details are stored in PostgreSQL. Group and DM distribution is opt-in; users must start the bot before receiving DMs. The bot never publishes a phone number or Telegram username in the profile card. Configure required public channels and grant the bot administrator permissions before enabling publishing.
