@@ -111,3 +111,16 @@ Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, an
 - The Bot Owner is exempt from the bot's automatic group text moderation and cannot be targeted by its warning/anti-nuke actions.
 - The bot only tracks groups after it receives an update from them, and private users after they start the bot. Broadcast delivery is subject to Telegram limits, blocked DMs, and the bot's current database. Render Free ephemeral storage may erase this audience list after redeploy/restart.
 - Send ads responsibly and only to users who have started the bot and have not opted out.
+
+
+## Ultimate X member tools (added)
+
+- `/id` — show your Telegram user ID and current chat ID; reply to a member's message to inspect their ID.
+- `/profile` — show the member profile and message count tracked by the bot.
+- `/report reason` — reply to a message to create a persistent report for the group.
+- `/reports` — group admins can review the latest open reports.
+- `/closereport ID` — group admins can close a report.
+- `/afk reason` — set your AFK status in a group; it clears when you next send a message.
+- `/note text`, `/notes`, `/delnote ID` — save, list and delete your own group-scoped notes.
+
+Member profiles, reports, AFK state and notes are stored in PostgreSQL and survive bot restarts. Message counts begin when this version is deployed; the bot cannot reconstruct earlier message history. Reports are saved even if an administrator has not opened a private chat with the bot; use `/reports` in the group to review them. Private report notifications are best-effort only.
