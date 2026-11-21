@@ -194,15 +194,78 @@ async def send_reply(message, row):
         await message.reply_document(file_id, **kwargs)
 
 
+def start_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("👑 Owner", url="https://t.me/Alcohol_1752"),
+            InlineKeyboardButton("📢 Channel", url="https://t.me/myaayech"),
+        ],
+        [InlineKeyboardButton("📖 Bot Help", callback_data="start:help")],
+    ])
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user and update.effective_chat and update.effective_chat.type == "private":
         with db() as conn:
             conn.execute("INSERT OR IGNORE INTO known_users(user_id,first_seen) VALUES(?,?)", (user.id, time.time()))
     await update.effective_message.reply_text(
-        "🤖 PRO Reply Bot Ultimate X\n"
-        "Keyword သတ်မှတ်ထားတဲ့အတိုင်း အလိုအလျောက် Reply ပြန်ပေးပါတယ်။\n"
-        "အသုံးပြုနည်း: /help"
+        "🤖 PRO Reply Bot Ultimate X\n\n"
+        "Group များအတွက် Smart Auto Reply၊ Admin Tools၊ Security နဲ့ Moderation စနစ်များ ပါဝင်တဲ့ Bot ဖြစ်ပါတယ်။\n\n"
+        "အောက်က Button များကို နှိပ်ပြီး Owner၊ Channel နဲ့ အသုံးပြုနည်းများကို ကြည့်နိုင်ပါတယ်။",
+        reply_markup=start_keyboard(),
+    )
+
+
+async def start_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "start:home":
+        await query.edit_message_text(
+            "🤖 PRO Reply Bot Ultimate X\n\n"
+            "Group များအတွက် Smart Auto Reply၊ Admin Tools၊ Security နဲ့ Moderation စနစ်များ ပါဝင်တဲ့ Bot ဖြစ်ပါတယ်။\n\n"
+            "အောက်က Button များကို နှိပ်ပြီး Owner၊ Channel နဲ့ အသုံးပြုနည်းများကို ကြည့်နိုင်ပါတယ်။",
+            reply_markup=start_keyboard(),
+        )
+        return
+
+    help_text = (
+        "📖 PRO Reply Bot Ultimate X — အပြည့်အစုံ လမ်းညွှန်\n\n"
+        "🤖 **1. Smart Auto Reply**\n"
+        "• Keyword သတ်မှတ်ပြီး စာသား၊ ဓာတ်ပုံ၊ GIF၊ Video စသည်တို့ကို အလိုအလျောက် Reply ပြန်နိုင်သည်။\n"
+        "• Exact / Contains / Startswith စနစ်၊ Reply ဦးစားပေးမှု၊ Reply ဖြစ်နိုင်ခြေနှင့် Cooldown သတ်မှတ်နိုင်သည်။\n"
+        "• Group စကားဝိုင်းမှ သင်ယူပြီး Reply ပြန်နိုင်သည့် Learning စနစ် ပါဝင်သည်။\n\n"
+        "🛡️ **2. Group Security & Moderation**\n"
+        "• Anti-Spam၊ Anti-Link၊ Flood ကာကွယ်မှု၊ Raid / Anti-Nuke စောင့်ကြည့်မှု။\n"
+        "• တားမြစ်စကားလုံး၊ 18+ စာသား Filter၊ Warn၊ Mute၊ Kick၊ Ban စနစ်များ။\n"
+        "• Group Admin များက စည်းကမ်း၊ Lock / Unlock နှင့် Welcome / Goodbye ကို စီမံနိုင်သည်။\n\n"
+        "👥 **3. Member Tools**\n"
+        "• Member ID၊ Profile၊ AFK၊ ကိုယ်ပိုင် Notes နှင့် Admin ထံ Report ပို့ခြင်း။\n\n"
+        "💘 **4. Relationship System (18+)**\n"
+        "• Private Chat မှ Profile ဖန်တီး/ပြင်ဆင်ပြီး သဘောတူညီချက်ဖြင့် Publish လုပ်နိုင်သည်။\n"
+        "• Channel Join စစ်ဆေးမှု၊ Profile ရှာဖွေမှု၊ Like၊ Report၊ Block / Unblock ပါဝင်သည်။\n"
+        "• Group နှင့် DM များတွင် လက်ခံရန် ကိုယ်တိုင် Opt-in လုပ်ထားမှသာ Post ပို့မည်။\n\n"
+        "👑 **5. Bot Owner Tools**\n"
+        "• /owner — Owner Control Center\n"
+        "• /ad groups|users|all — ကြော်ငြာပို့ရန် (ကြော်ငြာစာကို Reply လုပ်ပြီး သုံးပါ)\n"
+        "• /adstats — ကြော်ငြာပို့နိုင်သည့် Group/User စာရင်း\n"
+        "• /backup — Database Backup ယူရန်\n\n"
+        "⚙️ **6. အရေးကြီး Commands**\n"
+        "• /help — Command စာရင်းအပြည့်အစုံ\n"
+        "• /panel — Group Admin Dashboard\n"
+        "• /addreply keyword | reply — Auto Reply ထည့်ရန်\n"
+        "• /listreplies — Reply စာရင်းကြည့်ရန်\n"
+        "• /autoreply on|off — Auto Reply ဖွင့်/ပိတ်ရန်\n"
+        "• /security on|off — Security ဖွင့်/ပိတ်ရန်\n"
+        "• /rules — Group စည်းကမ်းကြည့်ရန်\n"
+        "• /love — Relationship Menu\n\n"
+        "အသုံးပြုနိုင်သော Command အားလုံးကို /help မှာ ကြည့်နိုင်ပါတယ်။"
+    )
+    await query.edit_message_text(
+        help_text,
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("⬅️ နောက်သို့", callback_data="start:home")
+        ]]),
     )
 
 
@@ -1121,6 +1184,7 @@ def main():
     logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(start_menu_callback, pattern=r"^start:"))
     app.add_handler(CommandHandler("owner", lambda u, c: owner_command(u, c, OWNER_ID)))
     for love_handler in relationship_handlers():
         app.add_handler(love_handler)
