@@ -235,3 +235,57 @@ async def report_command(update, context):
                 pass
     except Exception:
         pass
+
+
+async def reports_command(update, context):
+    msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
+    if not msg or not chat or not user or chat.type not in ("group", "supergroup"):
+        return
+    try:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        if member.status not in ("administrator", "creator"):
+            await msg.reply_text("Group Admin များသာ Report စာရင်းကြည့်နိုင်ပါတယ်။")
+            return
+    except Exception:
+        await msg.reply_text("Admin အခွင့်အရေး စစ်ဆေးမရပါ။")
+        return
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id,reporter_id,target_id,reason,created_at FROM member_reports "
+            "WHERE chat_id=? AND status='open' ORDER BY id DESC LIMIT 15",
+            (chat.id,),
+        ).fetchall()
+    if not rows:
+        await msg.reply_text("🚨 ဖွင့်ထားသော Report မရှိပါ။")
+        return
+    lines = ["🚨 Open Reports (နောက်ဆုံး ၁၅ ခု)"]
+    for row in rows:
+        lines.append(
+            f"#{row['id']} | တိုင်သူ {row['reporter_id']} → တိုင်ခံရသူ {row['target_id']}\n"
+            f"အကြောင်းပြချက်: {row['reason']}"
+        )
+    lines.append("ပိတ်ရန်: /closereport ID")
+    await msg.reply_text("\n\n".join(lines))
+
+
+async def close_report_command(update, context):
+    msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
+    if not msg or not chat or not user or chat.type not in ("group", "supergroup"):
+        return
+    try:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        if member.status not in ("administrator", "creator"):
+            await msg.reply_text("Group Admin များသာ Report ပိတ်နိုင်ပါတယ်။")
+            return
+    except Exception:
+        await msg.reply_text("Admin အခွင့်အရေး စစ်ဆေးမရပါ။")
+        return
+    if not context.args or not context.args[0].isdigit():
+        await msg.reply_text("အသုံးပြုပုံ: /closereport ID")
+        return
+    with connect() as conn:
+        cur = conn.execute(
+            "UPDATE member_reports SET status='closed' WHERE id=? AND chat_id=? AND status='open'",
+            (int(context.args[0]), chat.id),
+        )
+    await msg.reply_text("✅ Report ပိတ်ပြီးပါပြီ။" if cur.rowcount else "ဖွင့်ထားသော Report ID မတွေ့ပါ။")
