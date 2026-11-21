@@ -124,3 +124,7 @@ Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, an
 - `/note text`, `/notes`, `/delnote ID` — save, list and delete your own group-scoped notes.
 
 Member profiles, reports, AFK state and notes are stored in PostgreSQL and survive bot restarts. Message counts begin when this version is deployed; the bot cannot reconstruct earlier message history. Reports are saved even if an administrator has not opened a private chat with the bot; use `/reports` in the group to review them. Private report notifications are best-effort only.
+
+- `/setrules text` — group admins save persistent group rules.
+- `/rules` — members view the saved group rules.
+- `/lock` and `/unlock` — group admins lock/unlock default member messaging permissions (bot needs Restrict Members permission).
