@@ -305,15 +305,33 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.effective_message.reply_text(_hud_text("⏰ Quiz မရှိတော့ပါ။ /quiz နဲ့ အသစ်စပါ။"))
             return
         if int(row["answer"]) != int(context.args[0]):
-            await update.effective_message.reply_text(_hud_text("❌ မမှန်သေးပါဘူး။ ထပ်စမ်းကြည့်ပါ။"))
+            msg = await update.effective_message.reply_text(_hud_text(
+                "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n"
+                "🔎 အဖြေစစ်ဆေးနေသည်...\n⏳ PLEASE WAIT"
+            ))
+            await _animate_hud(msg, [
+                "🧠 QUIZ CHECKER\n━━━━━━━━━━━━━━━━━━\n🔍 အဖြေကို စစ်ဆေးနေသည်...\n▰▱▱",
+                "🧠 QUIZ CHECKER\n━━━━━━━━━━━━━━━━━━\n⚠️ အဖြေမကိုက်ညီပါ...\n▰▰▱",
+                "🧠 QUIZ RESULT\n━━━━━━━━━━━━━━━━━━\n❌ WRONG ANSWER\nထပ်ကြိုးစားကြည့်ပါ!",
+            ], 0.35)
             return
         conn.execute("DELETE FROM game_quizzes WHERE chat_id=?", (chat_id,))
+    msg = await update.effective_message.reply_text(_hud_text(
+        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n"
+        "🔎 အဖြေစစ်ဆေးနေသည်...\n⚡ SCANNING"
+    ))
+    await _animate_hud(msg, [
+        "🧠 QUIZ CHECKER\n━━━━━━━━━━━━━━━━━━\n🔍 အဖြေကို စစ်ဆေးနေသည်...\n▰▱▱",
+        "🧠 QUIZ CHECKER\n━━━━━━━━━━━━━━━━━━\n✅ အဖြေမှန်ကြောင်း တွေ့ရှိ!\n▰▰▱",
+        "🧠 QUIZ REWARD\n━━━━━━━━━━━━━━━━━━\n🎉 VICTORY UNLOCKED!\n▰▰▰",
+    ], 0.4)
     account = _change(chat_id, user, coins=QUIZ_REWARD, xp=10, wins=1)
-    await update.effective_message.reply_text(_hud_text(
-        f"🎉 {user.full_name} မှန်ပါတယ်။ +{QUIZ_REWARD} Coin / +10 XP\n"
+    await msg.edit_text(_hud_text(
+        "🧠 NEXUS QUIZ ARENA • RESULT\n━━━━━━━━━━━━━━━━━━\n"
+        f"🏆 {user.full_name} မှန်ပါတယ်။\n"
+        f"🎁 +{QUIZ_REWARD} Coin / +10 XP\n"
         f"🪙 လက်ကျန်: {account['coins']:,} Coin"
     ))
-
 
 async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
