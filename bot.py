@@ -34,6 +34,7 @@ from learning import (
 from games import (
     init_games, set_games_enabled, game_help, balance, daily, topcoins,
     quiz, answer, fish, hunt, spin, duel, duel_accept, duel_decline,
+    addcoins, takecoins,
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
@@ -1533,6 +1534,8 @@ def main():
     app.add_handler(CommandHandler("duel", duel))
     app.add_handler(CommandHandler("duelaccept", duel_accept))
     app.add_handler(CommandHandler("dueldecline", duel_decline))
+    app.add_handler(CommandHandler("addcoins", addcoins))
+    app.add_handler(CommandHandler("takecoins", takecoins))
     app.add_handler(CommandHandler("game", game_toggle))
     app.add_handler(CommandHandler("panel", panel))
     app.add_handler(CommandHandler("addreply", add_reply))
