@@ -81,8 +81,12 @@ def _add_progress(conn, user_id, xp, won=True):
 
 def _bar(value, maximum, length=12):
     filled = max(0, min(length, int(value * length / max(1, maximum))))
-    return "🟩" * filled + "⬛" * (length - filled)
+    return "🟦" * filled + "▫️" * (length - filled)
 
+
+
+def _rarity_badge(rarity):
+    return {"Common": "⚪ COMMON", "Rare": "🔷 RARE", "Epic": "🟣 EPIC", "Legendary": "🟠 LEGENDARY", "Mythic": "🔴 MYTHIC"}.get(rarity, "⚪ COMMON")
 
 def _dungeon_keyboard(user_id):
     return InlineKeyboardMarkup([[
@@ -122,7 +126,7 @@ async def dungeon_command(update, context):
             (user.id,enemy,hp,enemy_hp,time.time()),
         )
     await update.effective_message.reply_text(
-        "╭━━ 🏰 MYAE DUNGEON RAID ━━╮\n"
+        "╭━━ 🏰 MYAE DUNGEON RAID ━━╮\n✦ ELITE CHALLENGE ✦\n"
         f"👹 Enemy: {enemy}\n"
         f"❤️ Your HP: {hp:,}\n"
         f"💀 Enemy HP: {enemy_hp:,}\n"
@@ -141,7 +145,7 @@ async def summon_command(update, context):
         coins = _wallet(conn, user.id)
         if coins < SUMMON_COST:
             await update.effective_message.reply_text(
-                f"🌟 HERO SUMMON\nလိုအပ်သော Coin: {SUMMON_COST:,}\nလက်ကျန်: {coins:,}"
+                f"╭━━ ✨ HERO SUMMON ━━╮\n🪙 လိုအပ်သော Coin: {SUMMON_COST:,}\n💰 လက်ကျန်: {coins:,}\n╰━━━━━━━━━━━━━━╯"
             )
             return
         conn.execute("UPDATE game_wallets SET coins=coins-? WHERE user_id=? AND coins>=?", (SUMMON_COST,user.id,SUMMON_COST))
@@ -163,16 +167,16 @@ async def summon_command(update, context):
         )
         balance = coins-SUMMON_COST
     await update.effective_message.reply_text(
-        "✨╭━━ HERO SUMMON ━━╮✨\n"
-        "🎴 NEW HERO ACQUIRED!\n"
+        "✦･ﾟﾟ･*:.｡..｡.:*･ﾟ ✨ SUMMON ✨\n"
+        "╭━━ 🎴 NEW HERO ACQUIRED ━━╮\n"
         f"{hero_name}\n"
-        f"💠 Rarity: {rarity}\n"
-        f"⚔️ Power: +{power}\n"
+        f"💠 RARITY: {_rarity_badge(rarity)}\n"
+        f"⚔️ HERO POWER: +{power}\n"
         f"🪙 Cost: {SUMMON_COST:,} Coin\n"
         f"💰 Balance: {balance:,} Coin\n"
         "╰━━━━━━━━━━━━━━╯",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🎒 My Heroes", callback_data="rpgx:heroes"),
+            InlineKeyboardButton("🎴  COLLECTION", callback_data="rpgx:heroes"),
             InlineKeyboardButton("🔮 Summon Again", callback_data="rpgx:summon"),
         ]]),
     )
@@ -226,7 +230,7 @@ async def treasure_command(update, context):
             (user.id,),
         )
     await update.effective_message.reply_text(
-        "🗺️╭━━ TREASURE EXPEDITION ━━╮\n"
+        "╭━━ 💎 TREASURE EXPEDITION ━━╮\n✦ MYSTIC ISLAND ✦\n"
         "ကျွန်းပေါ်မှာ ရတနာသေတ္တာ ၃ လုံး တွေ့ပြီ!\n"
         "တစ်လုံးထဲမှာ ရတနာကြီးရှိတယ်။ တစ်လုံးမှာ ထောင်ချောက်ရှိနိုင်တယ်။\n"
         "ဘယ်သေတ္တာကို ဖွင့်မလဲ?",
@@ -250,17 +254,18 @@ async def rpg_ultimate_callback(update, context):
 
     if action_name == "menu":
         await query.edit_message_text(
-            "🌌╭━━ MYAE ULTIMATE RPG ━━╮\n"
-            "⚔️ Dungeon Raid • 🌟 Hero Summon\n"
-            "💎 Treasure Expedition • 🎒 Hero Collection\n"
+            "╭━━━ 🌌 MYAE RPG UNIVERSE ━━━╮\n✦ LEGENDS AWAKEN ✦\n"
+            "⚔️ DUNGEON RAID  •  🐉 BOSS HUNT\n"
+            "✨ HERO SUMMON  •  🎴 COLLECTION\n"
+            "💎 TREASURE EXPEDITION\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "ကစားနည်းတစ်ခုကို ရွေးချယ်ပါ။",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🏰 Dungeon Raid", callback_data="rpgx:dungeon")],
-                [InlineKeyboardButton("🌟 Hero Summon", callback_data="rpgx:summon"),
+                [InlineKeyboardButton("🏰  DUNGEON RAID", callback_data="rpgx:dungeon")],
+                [InlineKeyboardButton("✨  HERO SUMMON", callback_data="rpgx:summon"),
                  InlineKeyboardButton("🎒 My Heroes", callback_data="rpgx:heroes")],
-                [InlineKeyboardButton("💎 Treasure Hunt", callback_data="rpgx:treasure")],
-                [InlineKeyboardButton("🏠 RPG Profile", callback_data="rpg:profile")],
+                [InlineKeyboardButton("💎  TREASURE HUNT", callback_data="rpgx:treasure")],
+                [InlineKeyboardButton("👑  RPG PROFILE", callback_data="rpg:profile")],
             ]),
         )
         return
@@ -386,15 +391,16 @@ async def rpg_ultimate_callback(update, context):
 async def ultimate_menu_command(update, context):
     await update.effective_message.reply_text(
         "🌌╭━━ MYAE ULTIMATE RPG ━━╮\n"
-        "⚔️ Dungeon Raid • 🌟 Hero Summon\n"
-        "💎 Treasure Expedition • 🎒 Hero Collection\n"
+        "⚔️ DUNGEON RAID  •  🐉 BOSS HUNT\n"
+        "✨ HERO SUMMON  •  🎴 COLLECTION\n"
+        "💎 TREASURE EXPEDITION\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "ကစားရန် အောက်က Menu ကိုနှိပ်ပါ။",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🏰 Dungeon Raid",callback_data="rpgx:dungeon")],
-            [InlineKeyboardButton("🌟 Hero Summon",callback_data="rpgx:summon"),
-             InlineKeyboardButton("🎒 My Heroes",callback_data="rpgx:heroes")],
-            [InlineKeyboardButton("💎 Treasure Hunt",callback_data="rpgx:treasure")],
-            [InlineKeyboardButton("🏠 RPG Profile",callback_data="rpg:profile")],
+            [InlineKeyboardButton("🏰  DUNGEON RAID",callback_data="rpgx:dungeon")],
+            [InlineKeyboardButton("✨  HERO SUMMON",callback_data="rpgx:summon"),
+             InlineKeyboardButton("🎴  COLLECTION",callback_data="rpgx:heroes")],
+            [InlineKeyboardButton("💎  TREASURE HUNT",callback_data="rpgx:treasure")],
+            [InlineKeyboardButton("👑  RPG PROFILE",callback_data="rpg:profile")],
         ]),
     )
