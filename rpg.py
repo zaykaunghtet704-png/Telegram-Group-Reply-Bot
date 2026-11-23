@@ -135,14 +135,15 @@ async def rpg_profile(update, context):
     frame = equipped.get("frame") or "Default Frame"
     await update.effective_message.reply_text(
         "╭━━━ 💗 MYAE RPG PROFILE ━━━╮\n"
-        f"👤 {user.full_name}\n🏷️ {title}\n🖼️ {frame}\n"
+        "       ✦  PREMIUM EDITION  ✦\n"
+        f"👤  {user.full_name}\n👑  {title}\n🖼️  {frame}\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        f"🏅 Class: {rank_title}\n⭐ RPG Level: {level}\n✨ Total XP: {xp:,}\n"
+        f"🏅 RANK: {rank_title}\n⭐ LEVEL: {level}  •  ✨ XP: {xp:,}\n"
         f"📊 Level Progress: [{progress_bar}] {level_xp}/100 XP\n"
         f"🎮 Games: {int(stats['games_played']):,}\n"
         f"🏆 Wins: {int(stats['wins']):,} | 💥 Losses: {int(stats['losses']):,}\n"
         f"📈 Win Rate: {win_rate:.1f}%\n🔥 Daily Streak: {daily_streak} day(s)\n"
-        f"🪙 Global Coins: {coins:,}\n"
+        f"💰 GLOBAL COINS: {coins:,}\n"
         "╰━━━━━━━━━━━━━━━━━━━━╯\n"
         "\n💡 အောက်က Menu ခလုတ်တွေကို နှိပ်ပြီး RPG ကို လွယ်လွယ်ကူကူ သုံးနိုင်ပါတယ်။",
         reply_markup=InlineKeyboardMarkup([
