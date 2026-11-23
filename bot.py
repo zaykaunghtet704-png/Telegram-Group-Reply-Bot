@@ -868,13 +868,13 @@ async def bot_membership_update(update, context):
 
     actor_text = f"{actor.full_name} (ID: {actor.id})" if actor else "မသိရှိနိုင်ပါ"
     message = (
-        "🆕 Bot ကို Group အသစ်ထဲ ထည့်သွင်းလိုက်ပါပြီ။\\n\\n"
-        f"📌 Group: {chat.title or 'Unknown'}\\n"
-        f"🆔 Group ID: {chat.id}\\n"
-        f"🔗 Group Link: {group_link}\\n"
-        f"👑 Group Owner: {creator_text}\\n"
-        f"➕ Bot ထည့်သူ: {actor_text}\\n"
-        f"🤖 Bot Status: {admin_text}\\n\\n"
+        "🆕 Bot ကို Group အသစ်ထဲ ထည့်သွင်းလိုက်ပါပြီ။\n\n"
+        f"📌 Group: {chat.title or 'Unknown'}\n"
+        f"🆔 Group ID: {chat.id}\n"
+        f"🔗 Group Link: {group_link}\n"
+        f"👑 Group Owner: {creator_text}\n"
+        f"➕ Bot ထည့်သူ: {actor_text}\n"
+        f"🤖 Bot Status: {admin_text}\n\n"
         "ဤအသိပေးချက်ကို Bot Owner ထံသို့သာ ပို့ထားပါသည်။"
     )
     try:
