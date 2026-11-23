@@ -23,3 +23,14 @@ services:
         sync: false
       - key: SECRET_KEY
         sync: false
+
+  - type: web
+    name: pro-reply-3d-games
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python game_server.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
