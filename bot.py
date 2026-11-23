@@ -1462,10 +1462,6 @@ async def handle_text(update, context):
         and msg.reply_to_message.from_user
         and context.bot.id == msg.reply_to_message.from_user.id
     )
-    mentioned_bot = any(
-        entity.type == "mention" and (msg.text or "").casefold().find("@") >= 0
-        for entity in (msg.entities or [])
-    )
     smart_reply = smart_conversation_reply(msg.text)
     if replied_to_bot and not smart_reply:
         smart_reply = "ဟုတ်ကဲ့ရှင် 💗 မြအေး နားထောင်နေပါတယ်။ ဆက်ပြောပါနော်။"
