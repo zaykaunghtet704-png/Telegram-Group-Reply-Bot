@@ -502,12 +502,12 @@ async def love_callback(update, context):
         return
     if action=="report":
         with connect() as conn:
-            conn.execute("INSERT INTO love_reports(reporter_id,reported_id,reason,created_at) VALUES(?,?,?,?)",(user.id,target,"Reported from profile card",time.time()))
-        with connect() as conn:
             exists = conn.execute("SELECT 1 FROM love_profiles WHERE user_id=? AND active=1 AND approved=1", (target,)).fetchone()
         if not exists:
             await q.answer("ဒီ Profile ကို မတွေ့ပါ။", show_alert=True)
             return
+        with connect() as conn:
+            conn.execute("INSERT INTO love_reports(reporter_id,reported_id,reason,created_at) VALUES(?,?,?,?)",(user.id,target,"Reported from profile card",time.time()))
         await q.answer("Report လက်ခံရရှိပါပြီ။",show_alert=True)
         if OWNER_ID:
             try: await context.bot.send_message(OWNER_ID,f"🚩 Relationship Report\nReporter: {user.id}\nReported: {target}")
