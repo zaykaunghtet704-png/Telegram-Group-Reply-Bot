@@ -28,7 +28,7 @@ services:
     name: pro-reply-3d-games
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python game_server.py
+    startCommand: gunicorn game_server:app --bind 0.0.0.0:$PORT
     envVars:
       - key: BOT_TOKEN
         sync: false
