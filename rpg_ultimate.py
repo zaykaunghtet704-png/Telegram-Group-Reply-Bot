@@ -273,7 +273,7 @@ async def rpg_ultimate_callback(update, context):
     if action_name == "dungeon":
         await dungeon_command(update, context)
         return
-    if action_name == "treasure":
+    if action == "treasure":
         await treasure_command(update, context)
         return
 
