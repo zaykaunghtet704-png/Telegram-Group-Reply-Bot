@@ -187,7 +187,7 @@ async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━━━━━\n"
         "3D World ထဲမှာ Character ကို Joystick နဲ့ လှုပ်ရှားပြီး ကစားနိုင်ပါပြီ။\n\n"
         "🎣 Fishing · ⚔️ Monster Hunt\n"
-        "🧠 Quiz Battle · 🎰 Lucky Spin\n"
+        "🧠 Quiz Battle · 🎰 Lucky Spin\n📚 Quiz Bank: 20,000 Questions\n"
         "🥊 1v1 Duel — Group Member နဲ့ စိန်ခေါ်ကစားရန်\n\n"
         "🪙 Group Coin / Level / XP ကို လက်ရှိ Bot Database နဲ့ ချိတ်ဆက်ထားပါတယ်။\n"
         "အောက်ကခလုတ်ကိုနှိပ်ပြီး Bot Private Chat ထဲမှာ Game ကိုဖွင့်ပါ။",
@@ -255,7 +255,7 @@ async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "answer=excluded.answer,expires_at=excluded.expires_at",
             (chat_id, question, json.dumps(options, ensure_ascii=False), answer, time.time() + 90),
         )
-    lines = ["🧠 QUIZ BATTLE", question]
+    lines = ["╔══════════════════════╗", "   🧠 3D ARENA • QUIZ", "╚══════════════════════╝", "🎮 PLAYER: " + _display(update.effective_user), "━━━━━━━━━━━━━━━━━━━━", "❓ " + question]
     lines.extend(f"{i}. {option}" for i, option in enumerate(options, 1))
     lines.append("\n/answer 1-4 ဖြေပါ။ ပထမဆုံးမှန်သူ +25 Coin / +10 XP ရမယ်။ (90 စက္ကန့်)")
     await update.effective_message.reply_text("\n".join(lines))
