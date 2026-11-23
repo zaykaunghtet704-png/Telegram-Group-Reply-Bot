@@ -95,6 +95,16 @@ def init_games():
             joined_at DOUBLE PRECISION NOT NULL,
             PRIMARY KEY(chat_id, user_id)
         )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS game_mines (
+            chat_id BIGINT NOT NULL,
+            user_id BIGINT NOT NULL,
+            username TEXT NOT NULL DEFAULT '',
+            bet BIGINT NOT NULL,
+            mines TEXT NOT NULL,
+            opened TEXT NOT NULL DEFAULT '[]',
+            created_at DOUBLE PRECISION NOT NULL,
+            PRIMARY KEY(chat_id, user_id)
+        )""")
         try:
             conn.execute("ALTER TABLE game_duels ADD COLUMN IF NOT EXISTS wager BIGINT NOT NULL DEFAULT 0")
         except Exception:
@@ -273,6 +283,7 @@ async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🎣 /fish 100 — ငါးဖမ်း\n⚔️ /hunt 100 — Monster Hunt\n"
         "🎰 /spin 100 — Slot Machine\n🥊 Member ကို Reply + /duel 100 — Duel\n\n"
         "👤 /balance — Coin / Level / Rank\n🏅 /rank — ကိုယ့် Rank (Member ကို Reply လုပ်လည်းရ)\n"
+        "💣 /mines 100 — Minefield | /pick 1-25 | /cashout\n"
         "🏆 /topcoins — Coin Top 10\n👑 /toprank — XP / Rank Top 10\n"
         "🎁 /daily — နေ့စဉ် Coin Reward\n\n"
         "📚 Quiz Bank: 20,000 Questions\n🧬 Level တစ်ဆင့်တက်ရန် 100 XP လိုအပ်သည်။"
@@ -315,10 +326,11 @@ async def toprank(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not rows:
         await update.effective_message.reply_text(_hud_text("🏆 Rank စာရင်း မရှိသေးပါ။"))
         return
-    lines = ["🏆 NEXUS RANK LEADERBOARD • TOP 10"]
+    lines = ["👑✨ NEXUS RANKING HALL OF FAME ✨👑", "━━━━━━━━━━━━━━━━━━"]
+    medals = ["🥇", "🥈", "🥉", "🏅", "🎖️", "💠", "💎", "🔥", "⚡", "🌟"]
     for i, row in enumerate(rows, 1):
         title, level, _ = _rank(row["xp"])
-        lines.append(f"{i}. {title} • {row['display_name']} — Lv.{level} | {row['xp']:,} XP")
+        lines.append(f"{medals[i-1]} {row['display_name']}\n   {title} • Lv.{level} • {row['xp']:,} XP")
     await update.effective_message.reply_text(_hud_text("\n".join(lines)))
 
 async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -352,9 +364,10 @@ async def topcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not rows:
         await update.effective_message.reply_text(_hud_text("🏆 Leaderboard မရှိသေးပါ။"))
         return
-    lines = ["🏆 COIN LEADERBOARD — TOP 10"]
+    lines = ["💰👑 NEXUS RICHEST PLAYERS 👑💰", "━━━━━━━━━━━━━━━━━━"]
+    medals = ["🥇", "🥈", "🥉", "🏅", "🎖️", "💠", "💎", "🔥", "⚡", "🌟"]
     for i, row in enumerate(rows, 1):
-        lines.append(f"{i}. {row['display_name']} — 🪙 {row['coins']:,} | Lv.{_level(row['xp'])}")
+        lines.append(f"{medals[i-1]} {row['display_name']}\n   🪙 {row['coins']:,} • ⭐ Lv.{_level(row['xp'])}")
     await update.effective_message.reply_text(_hud_text("\n".join(lines)))
 
 
@@ -421,9 +434,6 @@ async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bet=_valid_bet(context)
     if bet is None:
         await update.effective_message.reply_text(_hud_text("🎣 /fish 100 ဖြင့် လောင်းကြေးထည့်ပါ။ အနည်းဆုံး 10 Coin။")); return
-    wait=_cooldown(chat_id,user.id,"fish",60)
-    if wait:
-        await update.effective_message.reply_text(_hud_text(f"⏳ {wait} စက္ကန့်စောင့်ပါ။")); return
     if _stake(chat_id,user,bet) is None:
         await update.effective_message.reply_text(_hud_text("❌ Coin မလုံလောက်ပါ။ /balance စစ်ပါ။")); return
     name,_,_,_=random.choices(FISH,weights=[x[3] for x in FISH],k=1)[0]
@@ -442,9 +452,6 @@ async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bet=_valid_bet(context)
     if bet is None:
         await update.effective_message.reply_text(_hud_text("⚔️ /hunt 100 ဖြင့် လောင်းကြေးထည့်ပါ။ အနည်းဆုံး 10 Coin။")); return
-    wait=_cooldown(chat_id,user.id,"hunt",120)
-    if wait:
-        await update.effective_message.reply_text(_hud_text(f"⏳ {wait} စက္ကန့်စောင့်ပါ။")); return
     if _stake(chat_id,user,bet) is None:
         await update.effective_message.reply_text(_hud_text("❌ Coin မလုံလောက်ပါ။ /balance စစ်ပါ။")); return
     monster=random.choice(["Goblin","Wolf","Shadow Beast","Dragonling"])
@@ -455,6 +462,97 @@ async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+?,wins=wins+?,losses=losses+? WHERE chat_id=? AND user_id=?",(payout,20 if won else 5,1 if won else 0,0 if won else 1,chat_id,user.id))
         row=conn.execute("SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
     await m.edit_text(_hud_text(f"⚔️ HUNT RESULT • {'🏆 VICTORY' if won else '💥 DEFEAT'}\n👹 {monster}\n{'💰 Payout: '+format(payout,',')+' Coin (2x)' if won else '📉 Bet lost: '+format(bet,',')+' Coin'}\n⭐ XP +{20 if won else 5}\n🪙 Balance: {row['coins']:,}"))
+
+
+MINES_MULTIPLIERS = [1.25, 1.60, 2.10, 2.85, 3.95, 5.60, 8.20, 12.5, 20.0, 35.0]
+
+
+async def mines(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _ready(update): return
+    chat_id, user = update.effective_chat.id, update.effective_user
+    bet = _valid_bet(context)
+    if bet is None:
+        await update.effective_message.reply_text(_hud_text("💣 MINES ARENA\nအသုံးပြုပုံ: /mines 100\nအနည်းဆုံး 10 Coin။ /pick 1-25 ဖြင့် အကွက်ဖွင့်၊ /cashout ဖြင့် အနိုင်ငွေထုတ်ပါ။"))
+        return
+    with db() as conn:
+        active = conn.execute("SELECT bet FROM game_mines WHERE chat_id=? AND user_id=?", (chat_id, user.id)).fetchone()
+    if active:
+        await update.effective_message.reply_text(_hud_text(f"💣 Mine game ကစားနေဆဲပါ။ /pick 1-25 သို့မဟုတ် /cashout။ Bet {int(active['bet']):,} Coin"))
+        return
+    if _stake(chat_id, user, bet) is None:
+        await update.effective_message.reply_text(_hud_text("❌ Coin မလုံလောက်ပါ။ /balance စစ်ပါ။"))
+        return
+    mine_cells = sorted(random.sample(range(1, 26), 3))
+    with db() as conn:
+        conn.execute("INSERT INTO game_mines(chat_id,user_id,username,bet,mines,opened,created_at) VALUES(?,?,?,?,?,'[]',?)",
+                     (chat_id, user.id, _display(user), bet, json.dumps(mine_cells), time.time()))
+    board = "\n".join(" ".join(f"{n:02d}" for n in range(r*5+1, r*5+6)) for r in range(5))
+    m = await update.effective_message.reply_text(_hud_text("💣 NEXUS MINEFIELD\n⚡ စတင်ပြင်ဆင်နေသည်..."))
+    await _animate_hud(m, ["💣 MINEFIELD LOADED\n🛡️ သတိထားရွေးချယ်ပါ!", "🎮 5×5 GRID • 3 HIDDEN MINES"], 0.3)
+    await m.edit_text(_hud_text(f"💣 NEXUS MINEFIELD • 5×5\n👤 {user.full_name}\n🪙 Bet: {bet:,}\n\n{board}\n\n🔢 /pick 1 မှ 25 အထိ\n💰 /cashout — အနိုင်ငွေထုတ်ရန်\n⚠️ Mine ထိလျှင် Bet ဆုံးရှုံးမည်။"))
+
+
+async def pick_mine(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _ready(update): return
+    chat_id, user = update.effective_chat.id, update.effective_user
+    if not context.args or not context.args[0].isdigit() or not 1 <= int(context.args[0]) <= 25:
+        await update.effective_message.reply_text(_hud_text("အသုံးပြုပုံ: /pick 1 (1-25)")); return
+    cell = int(context.args[0])
+    with db() as conn:
+        game = conn.execute("SELECT * FROM game_mines WHERE chat_id=? AND user_id=?", (chat_id, user.id)).fetchone()
+    if not game:
+        await update.effective_message.reply_text(_hud_text("💣 Active Mine game မရှိပါ။ /mines 100 ဖြင့်စပါ။")); return
+    mines_set = set(json.loads(game["mines"]))
+    opened = set(json.loads(game["opened"]))
+    if cell in opened:
+        await update.effective_message.reply_text(_hud_text("ဒီအကွက်ကို ဖွင့်ပြီးသားပါ။ အခြားနံပါတ်ရွေးပါ။")); return
+    if cell in mines_set:
+        with db() as conn:
+            conn.execute("DELETE FROM game_mines WHERE chat_id=? AND user_id=?", (chat_id, user.id))
+            conn.execute("UPDATE game_accounts SET xp=xp+2,losses=losses+1 WHERE chat_id=? AND user_id=?", (chat_id, user.id))
+            row = conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?", (chat_id, user.id)).fetchone()
+        await update.effective_message.reply_text(_hud_text(f"💥 BOOM! MINE HIT!\n💣 အကွက် #{cell} မှာ မိုင်းပေါက်ကွဲသွားပြီ။\n📉 ဆုံးရှုံးငွေ: {int(game['bet']):,} Coin\n⭐ +2 XP\n🪙 လက်ကျန်: {row['coins']:,}\nနောက်တစ်ပွဲ /mines BET"))
+        return
+    opened.add(cell)
+    count = len(opened)
+    multiplier = MINES_MULTIPLIERS[min(count, len(MINES_MULTIPLIERS))-1]
+    with db() as conn:
+        conn.execute("UPDATE game_mines SET opened=? WHERE chat_id=? AND user_id=?", (json.dumps(sorted(opened)), chat_id, user.id))
+    board = []
+    for r in range(5):
+        board.append(" ".join("💎" if n in opened else "❔" for n in range(r*5+1, r*5+6)))
+    payout = int(int(game["bet"]) * multiplier)
+    await update.effective_message.reply_text(_hud_text(
+        f"💎 SAFE PICK! • #{cell}\n" + "\n".join(board) +
+        f"\n\n✅ Safe: {count} | 💰 Multiplier: {multiplier:g}x\n"
+        f"🎁 ယခု Cashout: {payout:,} Coin\nနောက်ထပ် /pick 1-25 | ငွေထုတ် /cashout"
+    ))
+
+
+async def cashout_mines(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _ready(update): return
+    chat_id, user = update.effective_chat.id, update.effective_user
+    with db() as conn:
+        game = conn.execute("SELECT * FROM game_mines WHERE chat_id=? AND user_id=?", (chat_id, user.id)).fetchone()
+    if not game:
+        await update.effective_message.reply_text(_hud_text("💣 Cashout လုပ်ရန် Active Mine game မရှိပါ။")); return
+    opened = json.loads(game["opened"])
+    if not opened:
+        await update.effective_message.reply_text(_hud_text("အနည်းဆုံး Safe အကွက် ၁ ခုဖွင့်ပြီးမှ Cashout လုပ်နိုင်ပါတယ်။ /pick 1-25")); return
+    multiplier = MINES_MULTIPLIERS[min(len(opened), len(MINES_MULTIPLIERS))-1]
+    payout = int(int(game["bet"]) * multiplier)
+    with db() as conn:
+        conn.execute("DELETE FROM game_mines WHERE chat_id=? AND user_id=?", (chat_id, user.id))
+        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+?,wins=wins+1 WHERE chat_id=? AND user_id=?",
+                     (payout, 8 + len(opened)*2, chat_id, user.id))
+        row = conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?", (chat_id, user.id)).fetchone()
+    await update.effective_message.reply_text(_hud_text(
+        f"💰✨ MINEFIELD CASHOUT SUCCESS! ✨💰\n💎 Safe Cells: {len(opened)}\n"
+        f"📈 Multiplier: {multiplier:g}x\n🎁 Payout: {payout:,} Coin\n"
+        f"⭐ XP +{8 + len(opened)*2}\n🪙 Balance: {row['coins']:,}\n"
+        "နောက်တစ်ပွဲ အချိန်မစောင့်ဘဲ /mines BET ဖြင့်ကစားနိုင်ပါပြီ။"
+    ))
+
 
 async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
