@@ -111,7 +111,9 @@ async def rpg_profile(update, context):
         stats = conn.execute("SELECT * FROM rpg_stats WHERE user_id=?", (user.id,)).fetchone()
         wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)).fetchone()
         loadout = conn.execute("SELECT slot,item_id FROM rpg_loadout WHERE user_id=?", (user.id,)).fetchall()
+        daily = conn.execute("SELECT streak FROM rpg_daily_claims WHERE user_id=?", (user.id,)).fetchone()
     stats = stats or {"games_played": 0, "wins": 0, "losses": 0, "total_xp": 0}
+    daily_streak = int(daily["streak"]) if daily else 0
     coins = int(wallet["coins"]) if wallet else 0
     xp = int(stats["total_xp"])
     level = xp // 100 + 1
@@ -138,7 +140,8 @@ async def rpg_profile(update, context):
         f"📊 Level Progress: [{progress_bar}] {level_xp}/100 XP\n"
         f"🎮 Games: {int(stats['games_played']):,}\n"
         f"🏆 Wins: {int(stats['wins']):,} | 💥 Losses: {int(stats['losses']):,}\n"
-        f"📈 Win Rate: {win_rate:.1f}%\n🪙 Global Coins: {coins:,}\n"
+        f"📈 Win Rate: {win_rate:.1f}%\n🔥 Daily Streak: {daily_streak} day(s)\n"
+        f"🪙 Global Coins: {coins:,}\n"
         "╰━━━━━━━━━━━━━━━━━━━━╯\n"
         "Mission ကြည့်ရန် /missions • Items ကြည့်ရန် /inventory"
     )
