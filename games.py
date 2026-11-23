@@ -1,4 +1,5 @@
 """Group command games and persistent virtual-coin economy."""
+import asyncio
 import json
 import random
 import time
@@ -349,12 +350,56 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         hours, mins = divmod(wait // 60, 60)
         await update.effective_message.reply_text(_hud_text(f"🎰 Spin ပြန်လှည့်ရန် {hours} နာရီ {mins} မိနစ် စောင့်ပါ။"))
         return
+
+    # Keep the existing reward odds and reveal the result with animated slot reels.
     reward = random.choices([0, 10, 25, 50, 100, 200], weights=[20, 25, 25, 18, 10, 2], k=1)[0]
+    prize_icons = {10: "🍒", 25: "🍋", 50: "🍉", 100: "🍇", 200: "💎"}
+    symbols = ["🍒", "🍋", "🍉", "🍇", "🍊", "⭐", "💎"]
+    message = await update.effective_message.reply_text(_hud_text(
+        "🎰 NEXUS SLOT MACHINE\\n"
+        "━━━━━━━━━━━━━━━━━━\\n"
+        "╭─────── 🎰 ───────╮\\n"
+        "│   ❔  │  ❔  │  ❔   │\\n"
+        "╰─────────────────╯\\n"
+        "⚡ REELS STARTING..."
+    ))
+
+    # Telegram displays each edit as the fruit reels roll in the group chat.
+    for frame in range(6):
+        reels = [random.choice(symbols) for _ in range(3)]
+        speed = "▰" * (6 - frame) + "▱" * frame
+        await message.edit_text(_hud_text(
+            "🎰 NEXUS SLOT MACHINE\\n"
+            "━━━━━━━━━━━━━━━━━━\\n"
+            f"╭─────── 🎰 ───────╮\\n"
+            f"│   {reels[0]}  │  {reels[1]}  │  {reels[2]}   │\\n"
+            "╰─────────────────╯\\n"
+            f"⚡ SPINNING  {speed}"
+        ))
+        await asyncio.sleep(0.8)
+
+    if reward:
+        icon = prize_icons[reward]
+        final_reels = [icon, icon, icon]
+    else:
+        final_reels = random.sample(symbols[:-1], 3)
+        if len(set(final_reels)) == 1:
+            final_reels[2] = "⭐"
+
     if reward:
         row = _change(chat_id, user, coins=reward, xp=3)
-        await update.effective_message.reply_text(_hud_text(f"🎰 Lucky Spin! +{reward} Coin ရပါပြီ။\n🪙 လက်ကျန်: {row['coins']:,}"))
+        result = f"🎉 JACKPOT! +{reward} COIN\\n🪙 လက်ကျန်: {row['coins']:,}\\n⭐ +3 XP"
     else:
-        await update.effective_message.reply_text(_hud_text("🎰 ဒီတစ်ကြိမ် ဆုမပေါက်ပါဘူး။ နောက်တစ်ကြိမ် ကံစမ်းပါ။"))
+        result = "😅 ဒီတစ်ကြိမ် ဆုမပေါက်ပါဘူး။ နောက်တစ်ကြိမ် ကံစမ်းပါ။"
+
+    await message.edit_text(_hud_text(
+        "🎰 NEXUS SLOT MACHINE • RESULT\\n"
+        "━━━━━━━━━━━━━━━━━━\\n"
+        f"╭─────── 🎰 ───────╮\\n"
+        f"│   {final_reels[0]}  │  {final_reels[1]}  │  {final_reels[2]}   │\\n"
+        "╰─────────────────╯\\n"
+        f"{result}"
+    ))
 
 
 async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
