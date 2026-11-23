@@ -129,7 +129,7 @@ async def dungeon_command(update, context):
         "━━━━━━━━━━━━━━━━━━━━\n"
         "⚔️ တိုက်ခိုက်ပြီး Dungeon ကို ရှင်းလင်းပါ။\n"
         f"🎟️ Entry: {entry:,} Coin",
-        reply_markup=_dungeon_keyboard(),
+        reply_markup=_dungeon_keyboard(user.id),
     )
 
 
@@ -250,10 +250,10 @@ async def rpg_ultimate_callback(update, context):
 
     if action_name == "menu":
         await query.edit_message_text(
-            "🌌╭━━ MYAE ULTIMATE RPG ━━╮\\n"
-            "⚔️ Dungeon Raid • 🌟 Hero Summon\\n"
-            "💎 Treasure Expedition • 🎒 Hero Collection\\n"
-            "━━━━━━━━━━━━━━━━━━━━\\n"
+            "🌌╭━━ MYAE ULTIMATE RPG ━━╮\n"
+            "⚔️ Dungeon Raid • 🌟 Hero Summon\n"
+            "💎 Treasure Expedition • 🎒 Hero Collection\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
             "ကစားနည်းတစ်ခုကို ရွေးချယ်ပါ။",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🏰 Dungeon Raid", callback_data="rpgx:dungeon")],
