@@ -93,7 +93,7 @@ async def owner_callback(update, context, owner_id):
             channels = conn.execute("SELECT COUNT(*) AS n FROM love_channels").fetchone()["n"]
             groups = conn.execute("SELECT COUNT(*) AS n FROM love_group_settings WHERE enabled=1").fetchone()["n"]
             dms = conn.execute("SELECT COUNT(*) AS n FROM love_dm_subscribers WHERE enabled=1").fetchone()["n"]
-            text = f"💘 RELATIONSHIP CONTROL\\nProfiles: {profiles}\\nPublished/approved: {published}\\nOpen reports: {reports}\\nRequired channels: {channels}\\nOpt-in groups: {groups}\\nOpt-in DMs: {dms}\\n\\nManage channels: /lovechannel\\nReview reports: /lovereports"
+            text = f"💘 RELATIONSHIP CONTROL\nProfiles: {profiles}\nPublished/approved: {published}\nOpen reports: {reports}\nRequired channels: {channels}\nOpt-in groups: {groups}\nOpt-in DMs: {dms}\n\nManage channels: /lovechannel\nReview reports: /lovereports"
         elif key == "owner:maintenance":
             row = conn.execute("SELECT setting_value FROM owner_settings WHERE setting_key='maintenance'").fetchone()
             current = row["setting_value"] if row else "off"
