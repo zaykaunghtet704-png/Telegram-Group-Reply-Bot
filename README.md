@@ -4,7 +4,7 @@ Traditional Telegram group keyword auto-reply bot. This is **not an AI chatbot**
 
 ## Features
 - Myanmar and English command/help text
-- Per-group SQLite reply rules and settings
+- Persistent per-group PostgreSQL reply rules, settings, moderation records and member data
 - Keyword matching: `contains`, `exact`, `startswith`
 - Deterministic keyword matching: priority first, then exact/longer match specificity
 - Text, photo, GIF/animation, video, sticker, voice, audio and document replies
@@ -81,13 +81,13 @@ Render provides `PORT` and `RENDER_EXTERNAL_URL` to a Web Service. The app uses 
 2. Disable BotFather privacy mode with `/setprivacy` if it must read ordinary group messages; then remove and re-add the bot if Telegram asks.
 3. Give it permission to send messages and media.
 4. Promote the bot to group admin and grant Delete Messages, Ban Users, and Manage Chat permissions as needed. Use a group administrator account to run `/panel` or add reply rules.\n5. Set `OWNER_ID` in Render and start a private chat with the bot using `/start`, so anti-nuke alerts can reach the owner.
-5. To receive automatic backups, set `OWNER_ID` in Render and start a private chat with the bot using `/start`.
+4. To receive anti-nuke alerts and automatic backups, set `OWNER_ID` in Render and start a private chat with the bot using `/start`.
 
 ## Security limitations\n- Telegram does not provide bots with users’ personal profile bio text, so the bot cannot scan or delete a member’s private Bio. It can moderate links and repeated text posted as group messages.\n- Telegram does not provide a general feed of messages deleted by other admins, nor a reliable event for every group description/profile change.\n- Anti-nuke monitoring uses Telegram chat-member updates. The bot must be a group admin and must receive chat-member updates. It detects repeated removals/admin demotions; it cannot undo an action before Telegram reports it.\n- The owner decision button is only sent when `OWNER_ID` is configured and the owner has opened the bot privately. If the suspected actor is still a group admin, Telegram may prevent the bot from banning them; the group creator may need to demote them first.\n- These protections are OFF by default. Enable `/security on`, then `/antilink on` and/or `/antispam on` per group. Add recruitment/scam phrases with `/addfilterword phrase`; the bot deletes group messages containing those phrases.\n\n## Important storage note
 The primary database is PostgreSQL through `DATABASE_URL`. The old `replies.db` is retained as a one-time migration source and is not the live database. Use `/backup` regularly and configure `OWNER_ID` for scheduled PostgreSQL JSON backups. Keep the PostgreSQL database attached to both the bot and dashboard services.
 
 ## Local run
-Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, and run `python bot.py` only in an environment that also provides `RENDER_EXTERNAL_URL`; this project is currently configured for Render webhook deployment.
+Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, `OWNER_ID`, and `DATABASE_URL`, and provide `RENDER_EXTERNAL_URL` plus `PORT`; this project is configured for Render webhook deployment, not standalone polling.
 
 
 ## Content moderation and warnings
@@ -109,7 +109,7 @@ Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, an
 - A user must first open the bot and press Start before the bot can send private messages. Users can opt out with `/ads off` and opt back in with `/ads on`.
 - Group owners and group admins can manage only their own group's reply and moderation settings. They cannot use global advertising commands or control other groups.
 - The Bot Owner is exempt from the bot's automatic group text moderation and cannot be targeted by its warning/anti-nuke actions.
-- The bot only tracks groups after it receives an update from them, and private users after they start the bot. Broadcast delivery is subject to Telegram limits, blocked DMs, and the bot's current database. Render Free ephemeral storage may erase this audience list after redeploy/restart.
+- The bot only tracks groups after it receives an update from them, and private users after they start the bot. Broadcast delivery is subject to Telegram limits, blocked DMs, and the bot's current database. Group and opted-in private-user audience records are stored in PostgreSQL and survive bot restarts while the same database remains attached.
 - Send ads responsibly and only to users who have started the bot and have not opted out.
 
 
