@@ -414,7 +414,15 @@ async def adventure_command(update, context):
             ("💀 Bone Knight", 16),
         ]
         monster, base_power = random.choice(monsters)
-        player_power = level * 2 + random.randint(1, 20)
+        equipped = conn.execute(
+            "SELECT item_id FROM rpg_equipment_loadout WHERE user_id=?",
+            (user.id,),
+        ).fetchall()
+        gear_power = sum(
+            {"flame_sword": 12, "dragon_armor": 10, "phoenix_pet": 15, "shadow_blade": 25}.get(row["item_id"], 0)
+            for row in equipped
+        )
+        player_power = level * 2 + gear_power + random.randint(1, 20)
         enemy_power = base_power + level + random.randint(1, 12)
         won = player_power >= enemy_power
         xp = random.randint(25, 45) if won else random.randint(8, 15)
