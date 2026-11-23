@@ -79,6 +79,16 @@ def init_games():
             SELECT user_id, MAX(coins), MAX(last_daily) FROM game_accounts GROUP BY user_id
             ON CONFLICT(user_id) DO NOTHING
         """)
+        # If an earlier rollout created wallets before last_daily was added, backfill it.
+        conn.execute("""
+            UPDATE game_wallets w
+               SET last_daily=legacy.last_daily
+              FROM (
+                  SELECT user_id, MAX(last_daily) AS last_daily
+                    FROM game_accounts GROUP BY user_id
+              ) legacy
+             WHERE legacy.user_id=w.user_id AND w.last_daily=0
+        """)
         # Keep legacy game_accounts coin columns synchronized for older game logic.
         conn.execute("""CREATE OR REPLACE FUNCTION sync_game_wallet_from_account()
             RETURNS trigger AS $
