@@ -35,6 +35,7 @@ from coin_codes import (init_coin_codes, create_coin_code, redeem_coin_code, rev
 from rpg import (init_rpg, rpg_profile, missions_command, mission_claim_command, achievements_command, shop_command, buy_command, inventory_command, equip_command, rpg_daily_command, adventure_command, rpg_top_command)
 from rpg_expansion import (init_rpg_expansion, guild_create_command, guild_join_command, guild_leave_command, guild_command, guild_top_command, gear_command, gear_buy_command, gear_equip_command, world_boss_command, world_boss_attack_command)
 from rpg_ui import rpg_menu_callback
+from rpg_ultimate import (init_rpg_ultimate, rpg_ultimate_callback, ultimate_menu_command, dungeon_command, summon_command, heroes_command, treasure_command)
 from games import (
     init_games, set_games_enabled, game_help, balance, rank, toprank, daily, topcoins,
     quiz, answer, fish, hunt, mines, mine_callback, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
@@ -74,7 +75,7 @@ async def global_access_guard(update, context):
         # Keep every group game command and interactive Minefield button usable
         # while unrelated bot features are in maintenance mode.
         query = update.callback_query
-        if query and (query.data or "").startswith(("mine:", "rpg:")):
+        if query and (query.data or "").startswith(("mine:", "rpg:", "rpgx:")):
             return
         msg = update.effective_message
         raw = (msg.text or "").strip() if msg else ""
@@ -83,7 +84,7 @@ async def global_access_guard(update, context):
             "/games", "/balance", "/rank", "/daily", "/topcoins", "/toprank",
             "/quiz", "/answer", "/fish", "/hunt", "/spin", "/mines",
             "/pick", "/cashout", "/duel", "/duelaccept", "/dueldecline", "/redeem",
-            "/rpg", "/missions", "/missionclaim", "/achievements", "/shop", "/buy", "/inventory", "/equip", "/rpgdaily", "/adventure", "/rpgtop", "/guildcreate", "/guildjoin", "/guildleave", "/guild", "/guildtop", "/gear", "/gearbuy", "/gearequip", "/boss", "/bossattack",
+            "/rpg", "/missions", "/missionclaim", "/achievements", "/shop", "/buy", "/inventory", "/equip", "/rpgdaily", "/adventure", "/rpgtop", "/guildcreate", "/guildjoin", "/guildleave", "/guild", "/guildtop", "/gear", "/gearbuy", "/gearequip", "/boss", "/bossattack", "/ultimate", "/dungeon", "/summon", "/heroes", "/treasure",
             "/game",
         }
         if command in game_commands:
@@ -1822,6 +1823,7 @@ def main():
     init_games()
     init_rpg()
     init_rpg_expansion()
+    init_rpg_ultimate()
     init_coin_codes()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
@@ -1830,6 +1832,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(start_menu_callback, pattern=r"^start:"))
     app.add_handler(CallbackQueryHandler(rpg_menu_callback, pattern=r"^rpg:"))
+    app.add_handler(CallbackQueryHandler(rpg_ultimate_callback, pattern=r"^rpgx:"))
     app.add_handler(CallbackQueryHandler(mine_callback, pattern=r"^mine:"))
     app.add_handler(CommandHandler("owner", lambda u, c: owner_command(u, c, OWNER_ID)))
     app.add_handler(CommandHandler("ownerban", lambda u, c: owner_ban_command(u, c, OWNER_ID)))
@@ -1877,6 +1880,11 @@ def main():
     app.add_handler(CommandHandler("gearequip", gear_equip_command))
     app.add_handler(CommandHandler("boss", world_boss_command))
     app.add_handler(CommandHandler("bossattack", world_boss_attack_command))
+    app.add_handler(CommandHandler("ultimate", ultimate_menu_command))
+    app.add_handler(CommandHandler("dungeon", dungeon_command))
+    app.add_handler(CommandHandler("summon", summon_command))
+    app.add_handler(CommandHandler("heroes", heroes_command))
+    app.add_handler(CommandHandler("treasure", treasure_command))
     app.add_handler(CommandHandler("balance", balance))
     app.add_handler(CommandHandler("rank", rank))
     app.add_handler(CommandHandler("toprank", toprank))
