@@ -1368,7 +1368,7 @@ async def redeem_code_command(update, context):
         "🎉 𝗖𝗢𝗜𝗡 𝗖𝗢𝗗𝗘 𝗥𝗘𝗗𝗘𝗘𝗠𝗘𝗗! 🎉\n"
         "╭━━━━━━━━━━━━━━━━━━━━╮\n"
         f"💎 ရရှိသော Coin: +{result['amount']:,}\n"
-        f"💰 လက်ကျန် Coin: {result['balance']:,}\n"
+        f"🪙 လက်ကျန် Coin: {result['balance']:,}\n"
         f"🎟️ Code ကျန်အသုံးပြုခွင့်: {result['remaining']:,}\n"
         "╰━━━━━━━━━━━━━━━━━━━━╯\n"
         "💗 မြအေးနဲ့ ဂိမ်းဆက်ဆော့လို့ရပါပြီ။ /games"
