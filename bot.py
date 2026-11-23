@@ -34,6 +34,7 @@ from learning import (
 from coin_codes import (init_coin_codes, create_coin_code, redeem_coin_code, revoke_coin_code, coin_code_stats)
 from rpg import (init_rpg, rpg_profile, missions_command, mission_claim_command, achievements_command, shop_command, buy_command, inventory_command, equip_command, rpg_daily_command, adventure_command, rpg_top_command)
 from rpg_expansion import (init_rpg_expansion, guild_create_command, guild_join_command, guild_leave_command, guild_command, guild_top_command, gear_command, gear_buy_command, gear_equip_command, world_boss_command, world_boss_attack_command)
+from rpg_ui import rpg_menu_callback
 from games import (
     init_games, set_games_enabled, game_help, balance, rank, toprank, daily, topcoins,
     quiz, answer, fish, hunt, mines, mine_callback, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
@@ -1758,6 +1759,7 @@ def main():
     app.add_handler(TypeHandler(Update, global_access_guard), group=-20)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(start_menu_callback, pattern=r"^start:"))
+    app.add_handler(CallbackQueryHandler(rpg_menu_callback, pattern=r"^rpg:"))
     app.add_handler(CallbackQueryHandler(mine_callback, pattern=r"^mine:"))
     app.add_handler(CommandHandler("owner", lambda u, c: owner_command(u, c, OWNER_ID)))
     app.add_handler(CommandHandler("ownerban", lambda u, c: owner_ban_command(u, c, OWNER_ID)))
