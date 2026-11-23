@@ -69,12 +69,14 @@ def init_games():
         # One wallet per Telegram user, shared across every group.
         conn.execute("""CREATE TABLE IF NOT EXISTS game_wallets (
             user_id BIGINT PRIMARY KEY,
-            coins BIGINT NOT NULL DEFAULT 100
+            coins BIGINT NOT NULL DEFAULT 100,
+            last_daily DOUBLE PRECISION NOT NULL DEFAULT 0
         )""")
+        conn.execute("ALTER TABLE game_wallets ADD COLUMN IF NOT EXISTS last_daily DOUBLE PRECISION NOT NULL DEFAULT 0")
         # Merge old group balances without multiplying duplicate starter balances.
         conn.execute("""
-            INSERT INTO game_wallets(user_id, coins)
-            SELECT user_id, MAX(coins) FROM game_accounts GROUP BY user_id
+            INSERT INTO game_wallets(user_id, coins, last_daily)
+            SELECT user_id, MAX(coins), MAX(last_daily) FROM game_accounts GROUP BY user_id
             ON CONFLICT(user_id) DO NOTHING
         """)
         # Keep legacy game_accounts coin columns synchronized for older game logic.
@@ -186,7 +188,7 @@ def _account(chat_id, user):
         )
         return conn.execute(
             "SELECT ga.chat_id,ga.user_id,ga.username,ga.display_name,gw.coins AS coins,"
-            "ga.xp,ga.wins,ga.losses,ga.last_daily FROM game_accounts ga "
+            "ga.xp,ga.wins,ga.losses,gw.last_daily AS last_daily FROM game_accounts ga "
             "JOIN game_wallets gw ON gw.user_id=ga.user_id "
             "WHERE ga.chat_id=? AND ga.user_id=?",
             (chat_id, user.id),
@@ -411,8 +413,17 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     with db() as conn:
         conn.execute(
-            "UPDATE game_accounts SET coins=coins+?, xp=xp+10, last_daily=? WHERE chat_id=? AND user_id=?",
-            (DAILY_COINS, now, chat_id, user.id),
+            "UPDATE game_wallets SET coins=coins+?, last_daily=? WHERE user_id=?",
+            (DAILY_COINS, now, user.id),
+        )
+        conn.execute(
+            "UPDATE game_accounts SET coins=(SELECT coins FROM game_wallets WHERE user_id=?), "
+            "last_daily=? WHERE user_id=?",
+            (user.id, now, user.id),
+        )
+        conn.execute(
+            "UPDATE game_accounts SET xp=xp+10 WHERE chat_id=? AND user_id=?",
+            (chat_id, user.id),
         )
     await update.effective_message.reply_text(_hud_text(f"🎁 Daily Reward ရပါပြီ။ +{DAILY_COINS} Coin၊ +10 XP"))
 
@@ -835,6 +846,9 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
         d2=conn.execute("UPDATE game_wallets SET coins=coins-? WHERE user_id=? AND coins>=?",(wager,user.id,wager))
         if d2.rowcount!=1:
             conn.execute("UPDATE game_wallets SET coins=coins+? WHERE user_id=?",(wager,challenger))
+            wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (challenger,)).fetchone()
+            if wallet:
+                conn.execute("UPDATE game_accounts SET coins=? WHERE user_id=?", (int(wallet["coins"]), challenger))
             await update.effective_message.reply_text(_hud_text("❌ သင့် Coin မလုံလောက်ပါ။")); return
         conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
         for wallet_user_id in (challenger, user.id):
@@ -891,8 +905,9 @@ async def _owner_coin_change(update: Update, context: ContextTypes.DEFAULT_TYPE,
             target_id = int(context.args[0])
             with db() as conn:
                 row = conn.execute(
-                    "SELECT user_id, display_name FROM game_accounts WHERE chat_id=? AND user_id=?",
-                    (update.effective_chat.id, target_id),
+                    "SELECT user_id, MAX(display_name) AS display_name FROM game_accounts "
+                    "WHERE user_id=? GROUP BY user_id",
+                    (target_id,),
                 ).fetchone()
             if not row:
                 await msg.reply_text(_hud_text("❌ ဒီ Group ရဲ့ Game Account ထဲမှာ အဲဒီ USER_ID ကို မတွေ့ပါ။"))
