@@ -99,6 +99,17 @@ function init3D(){
  for(let i=0;i<35;i++){let x=(Math.random()-.5)*55,z=(Math.random()-.5)*55;if(Math.abs(x)<9&&z<-1&&z>-16)continue;tree(x,z)}
  player=new THREE.Group();const body=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.95,12),new THREE.MeshStandardMaterial({color:0x2878d0}));body.position.y=1;body.castShadow=true;player.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.32,16,12),new THREE.MeshStandardMaterial({color:0xffd1a5}));head.position.y=1.75;head.castShadow=true;player.add(head);const pack=new THREE.Mesh(new THREE.BoxGeometry(.45,.5,.25),new THREE.MeshStandardMaterial({color:0xf0b43c}));pack.position.set(0,1,.4);player.add(pack);player.position.set(0,0,4);scene.add(player);
  for(let i=0;i<6;i++){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.5+Math.random()*.7),new THREE.MeshStandardMaterial({color:0x788b85}));rock.position.set((Math.random()-.5)*35,.35,(Math.random()-.5)*35);rock.castShadow=true;scene.add(rock)}
+ // Ancient portal landmark: lightweight geometry, no external assets.
+ const portal=new THREE.Group();
+ const portalRing=new THREE.Mesh(new THREE.TorusGeometry(2.15,.16,10,48),new THREE.MeshStandardMaterial({color:0x65eaff,emissive:0x147fba,emissiveIntensity:1.25,metalness:.55,roughness:.22}));
+ portalRing.position.y=2.25;portal.add(portalRing);
+ const portalCore=new THREE.Mesh(new THREE.CircleGeometry(1.92,40),new THREE.MeshBasicMaterial({color:0x2867a5,transparent:true,opacity:.28,side:THREE.DoubleSide}));
+ portalCore.position.y=2.25;portal.add(portalCore);
+ const pillarMat=new THREE.MeshStandardMaterial({color:0x526d91,metalness:.55,roughness:.32});
+ for(const side of [-1,1]){const pillar=new THREE.Mesh(new THREE.BoxGeometry(.48,3.2,.55),pillarMat);pillar.position.set(side*2.05,1.6,-.05);portal.add(pillar);const cap=new THREE.Mesh(new THREE.OctahedronGeometry(.42),new THREE.MeshStandardMaterial({color:0x7eefff,emissive:0x1d9ac4,emissiveIntensity:.8}));cap.position.set(side*2.05,3.45,0);portal.add(cap)}
+ portal.position.set(0,0,-20);scene.add(portal);
+ const crystalMat=new THREE.MeshStandardMaterial({color:0x72eaff,emissive:0x1a8ebc,emissiveIntensity:.65,metalness:.35,roughness:.2});
+ for(let i=0;i<7;i++){const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(.35+Math.random()*.38),crystalMat);crystal.position.set((Math.random()-.5)*30,.8+Math.random()*1.4,(Math.random()-.5)*30);crystal.rotation.set(Math.random(),Math.random(),Math.random());scene.add(crystal)}
  clock=new THREE.Clock();animate();window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 }
 function tree(x,z){const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18,.28,1.5,7),new THREE.MeshStandardMaterial({color:0x765034}));trunk.position.set(x,.75,z);trunk.castShadow=true;scene.add(trunk);const top=new THREE.Mesh(new THREE.ConeGeometry(1.25,2.7,8),new THREE.MeshStandardMaterial({color:Math.random()>.5?0x247849:0x327f52}));top.position.set(x,2.5,z);top.castShadow=true;scene.add(top)}
