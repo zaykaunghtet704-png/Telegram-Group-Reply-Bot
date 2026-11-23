@@ -341,23 +341,36 @@ async def owner_ad_command(update, context):
     status = await msg.reply_text(f"📢 ကြော်ငြာပို့နေပါပြီ။\nTarget: {target}\nစုစုပေါင်း: {len(targets)}")
     sent = failed = 0
     for kind, chat_id in targets:
-        try:
-            await context.bot.copy_message(chat_id=chat_id, from_chat_id=source.chat_id, message_id=source.message_id)
-            sent += 1
-        except RetryAfter as exc:
-            await asyncio.sleep(float(exc.retry_after) + 0.5)
+        delivered = False
+        for attempt in range(3):
             try:
-                await context.bot.copy_message(chat_id=chat_id, from_chat_id=source.chat_id, message_id=source.message_id)
+                await context.bot.copy_message(
+                    chat_id=chat_id,
+                    from_chat_id=source.chat_id,
+                    message_id=source.message_id,
+                )
                 sent += 1
+                delivered = True
+                break
+            except RetryAfter as exc:
+                if attempt == 2:
+                    failed += 1
+                else:
+                    await asyncio.sleep(float(exc.retry_after) + 0.5)
+            except Forbidden:
+                failed += 1
+                if kind == "group":
+                    with db() as conn:
+                        conn.execute("UPDATE known_groups SET active=0 WHERE chat_id=?", (chat_id,))
+                else:
+                    with db() as conn:
+                        conn.execute("UPDATE known_users SET ads_enabled=0 WHERE user_id=?", (chat_id,))
+                break
             except TelegramError:
                 failed += 1
-        except (Forbidden, TelegramError):
-            failed += 1
-            if kind == "group":
-                with db() as conn: conn.execute("UPDATE known_groups SET active=0 WHERE chat_id=?", (chat_id,))
-            else:
-                with db() as conn: conn.execute("UPDATE known_users SET ads_enabled=0 WHERE user_id=?", (chat_id,))
-        await asyncio.sleep(0.05)
+                logger.exception("Owner broadcast failed for target %s", chat_id)
+                break
+        await asyncio.sleep(0.1)
     await status.edit_text(f"📢 ကြော်ငြာပို့ပြီးပါပြီ။\nTarget: {target}\nအောင်မြင်: {sent}\nမအောင်မြင်: {failed}")
 
 async def owner_ad_stats(update, context):
