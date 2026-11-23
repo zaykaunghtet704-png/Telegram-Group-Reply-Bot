@@ -1258,7 +1258,8 @@ async def code_create_command(update, context):
             "• /codecreate 5000 — လူတစ်ယောက်သာ ရယူနိုင်\n"
             "• /codecreate 5000 20 — လူ ၂၀ ရယူနိုင်\n"
             "• /codecreate 10000 50 24 — လူ ၅၀၊ ၂၄ နာရီအတွင်းသာ\n\n"
-            "အသုံးပြုပြီးသား User တစ်ယောက်က Code တစ်ခုကို ထပ်မံရယူလို့ မရပါ။"
+            "Code တစ်ခုကို User တစ်ယောက်လျှင် တစ်ကြိမ်သာ ရယူနိုင်ပါတယ်။\n"
+            "ဖန်တီးပြီးတာနဲ့ Bot ရှိတဲ့ Group အားလုံးကို အလိုအလျောက် ပို့ပေးပါမယ်။"
         )
         return
     amount = int(context.args[0])
@@ -1273,17 +1274,69 @@ async def code_create_command(update, context):
         logger.exception("Coin code creation failed")
         await msg.reply_text("❌ Coin Code ဖန်တီးမရပါ။ Database ကို စစ်ဆေးပါ။")
         return
+
     expiry_text = f"{expiry} နာရီ" if expiry else "သက်တမ်းမကုန်"
-    await msg.reply_text(
-        "✨ 𝗠𝗬𝗔𝗘 • COIN CODE CREATED ✨\n"
+    announcement = (
+        "✨ 𝗠𝗬𝗔𝗘 • GLOBAL COIN DROP ✨\n"
         "╭━━━━━━━━━━━━━━━━━━━━╮\n"
         f"💎 Reward: +{amount:,} COINS\n"
-        f"🎟️ Uses: {uses:,} ယောက်\n"
-        f"⏳ Expiry: {expiry_text}\n"
+        f"🎟️ အသုံးပြုခွင့်: {uses:,} ယောက်\n"
+        f"⏳ သက်တမ်း: {expiry_text}\n"
         "╰━━━━━━━━━━━━━━━━━━━━╯\n\n"
-        f"🎁 YOUR CODE\n{code}\n\n"
-        "📩 ဒီ Code ကို Member တွေဆီ ပို့ပေးနိုင်ပါပြီ။\n"
-        "အသုံးပြုရန်: /redeem CODE"
+        "🎁 COIN REWARD CODE\n"
+        f"<code>{code}</code>\n\n"
+        "🎯 ရယူရန် အောက်က Command ကို ပို့ပါ။\n"
+        f"<code>/redeem {code}</code>\n\n"
+        "⚠️ လူဦးရေကန့်သတ်ချက် ပြည့်သွားရင် ရယူလို့မရတော့ပါဘူး။"
+    )
+
+    # Send the code to the chat where the owner created it, then to every
+    # other group currently recorded as active in known_groups.
+    try:
+        await msg.reply_text(announcement, parse_mode="HTML")
+    except TelegramError:
+        logger.exception("Could not send coin code announcement to creator chat")
+        return
+
+    with db() as conn:
+        groups = [row["chat_id"] for row in conn.execute(
+            "SELECT chat_id FROM known_groups WHERE active=1"
+        ).fetchall()]
+
+    current_chat = update.effective_chat.id if update.effective_chat else None
+    sent = 1 if current_chat in groups else 0
+    failed = 0
+    for chat_id in groups:
+        if chat_id == current_chat:
+            continue
+        for attempt in range(3):
+            try:
+                await context.bot.send_message(chat_id=chat_id, text=announcement, parse_mode="HTML")
+                sent += 1
+                break
+            except RetryAfter as exc:
+                if attempt == 2:
+                    failed += 1
+                else:
+                    await asyncio.sleep(float(exc.retry_after) + 0.5)
+            except Forbidden:
+                failed += 1
+                with db() as conn:
+                    conn.execute("UPDATE known_groups SET active=0 WHERE chat_id=?", (chat_id,))
+                break
+            except TelegramError:
+                failed += 1
+                logger.exception("Coin code broadcast failed for group %s", chat_id)
+                break
+        await asyncio.sleep(0.1)
+
+    await msg.reply_text(
+        "📡 𝗠𝗬𝗔𝗘 • GLOBAL COIN DROP REPORT\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"✅ ပို့နိုင်သော Group: {sent:,}\n"
+        f"❌ မပို့နိုင်သော Group: {failed:,}\n"
+        f"🎯 စာရင်းရှိ Active Group: {len(groups):,}\n\n"
+        "Member များသည် /redeem CODE ဖြင့် Coin ရယူနိုင်ပါပြီ။"
     )
 
 
