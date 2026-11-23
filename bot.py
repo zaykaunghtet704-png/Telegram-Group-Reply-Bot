@@ -39,7 +39,7 @@ from games import (
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
-GAME_WEBAPP_URL = os.getenv("GAME_WEBAPP_URL", "https://pro-reply-3d-games.onrender.com").rstrip("/")
+GAME_WEBAPP_URL = os.getenv("GAME_WEBAPP_URL", "").strip().rstrip("/")
 BACKUP_INTERVAL_HOURS = max(1, int(os.getenv("BACKUP_INTERVAL_HOURS", "24")))
 
 logging.basicConfig(
@@ -276,13 +276,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             group_id = int(context.args[0][5:])
         except ValueError:
             group_id = 0
-        if group_id:
+        if group_id and GAME_WEBAPP_URL:
             await update.effective_message.reply_text(
                 "🎮 NEXUS 3D GAME HUB\nGroup ထဲက သင့် Coin နဲ့ Level ကို အသုံးပြုပြီး ကစားနိုင်ပါပြီ။",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("🚀 PLAY 3D GAME", web_app=WebAppInfo(url=f"{GAME_WEBAPP_URL}/?chat_id={group_id}"))
                 ]])
             )
+            return
+        if group_id and not GAME_WEBAPP_URL:
+            await update.effective_message.reply_text("3D Game Service URL မသတ်မှတ်ရသေးပါ။ Render Blueprint ကို Sync လုပ်ပါ။")
             return
     await update.effective_message.reply_text(
         "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 𝗕𝗢𝗧 💎\n"
