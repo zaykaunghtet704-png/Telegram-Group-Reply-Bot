@@ -188,6 +188,10 @@ Placeholders: `{name}` (member name), `{username}` (Telegram username), `{id}` (
 - `/achievements` — view unlocked game milestones.
 - `/shop`, `/buy ITEM_ID` — buy cosmetic profile frames and titles with the shared global Coin wallet.
 - `/inventory`, `/equip ITEM_ID` — view and equip owned cosmetic items.
+- `/rpgdaily` — claim a once-per-day RPG reward; consecutive daily claims build a streak (up to 1,000 Coins and 50 RPG XP).
+- `/adventure` — enter a solo monster encounter every 30 minutes; victory awards global Coins and RPG XP, while defeat still grants some XP.
+- `/rpgtop` — show the global Top 10 RPG XP leaderboard.
+- RPG profiles now show a progression class and a 10-step XP progress bar; classes advance from Novice Adventurer to Immortal Legend.
 - RPG statistics, mission progress, inventory and loadout are stored in PostgreSQL and included in database backups.
 - RPG XP is a separate lifetime progression track and starts accumulating when the RPG update is deployed; existing game XP and ranks remain unchanged.
 - Current cosmetic shop items are visual profile decorations only; they do not change game odds or payouts.
