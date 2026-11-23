@@ -139,7 +139,7 @@ async def gear_buy_command(update, context):
             ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=rpg_equipment.quantity+1""",(user.id,item_id))
         wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?",(user.id,)).fetchone()
         conn.execute("UPDATE game_accounts SET coins=? WHERE user_id=?",(int(wallet["coins"]),user.id))
-    await update.effective_message.reply_text(f"✅ {item['name']} ဝယ်ပြီးပါပြီ။\n🪙 လက်ကျန် {int(wallet['coins']):,} Coin\nတပ်ရန် /gearequip {item_id}")
+    await update.effective_message.reply_text(f"✅ {item['name']} ဝယ်ပြီးပါပြီ။\n💰 လက်ကျန် {int(wallet['coins']):,} Coin\nတပ်ရန် /gearequip {item_id}")
 
 async def gear_equip_command(update, context):
     user = update.effective_user
@@ -220,6 +220,6 @@ async def world_boss_attack_command(update, context):
         conn.execute("UPDATE game_accounts SET coins=? WHERE user_id=?",(int(wallet["coins"]),user.id))
     await update.effective_message.reply_text(
         f"⚔️ WORLD BOSS ATTACK\n👤 {user.full_name}\n💥 Damage: {damage:,}\n"
-        f"🐉 Boss HP: {int(result['hp']):,}/100,000\n✨ RPG XP: +{xp}\n🪙 Reward: +{reward:,} Coin\n"
+        f"🐉 Boss HP: {int(result['hp']):,}/100,000\n✨ RPG XP: +{xp}\n💰 Reward: +{reward:,} Coin\n"
         + ("🏆 BOSS DEFEATED! FINAL HIT BONUS +500 COIN!" if bonus else "ထပ်တိုက်ရန် /bossattack")
     )
