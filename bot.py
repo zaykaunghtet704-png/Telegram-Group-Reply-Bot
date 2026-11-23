@@ -33,7 +33,7 @@ from learning import (
 )
 from games import (
     init_games, set_games_enabled, game_help, balance, rank, toprank, daily, topcoins,
-    quiz, answer, fish, hunt, spin, duel, duel_accept, duel_decline,
+    quiz, answer, fish, hunt, mines, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
     addcoins, takecoins,
 )
 
@@ -1450,6 +1450,9 @@ async def post_init(app):
         ("answer", "Answer the active quiz"),
         ("fish", "Go fishing for coins"),
         ("hunt", "Fight a monster for rewards"),
+        ("mines", "Play the 5x5 minefield"),
+        ("pick", "Open a minefield cell 1-25"),
+        ("cashout", "Collect minefield winnings"),
         ("spin", "Use the lucky spin"),
         ("duel", "Challenge a member to a duel"),
         ("duelaccept", "Accept a duel challenge"),
@@ -1574,6 +1577,9 @@ def main():
     app.add_handler(CommandHandler("answer", answer))
     app.add_handler(CommandHandler("fish", fish))
     app.add_handler(CommandHandler("hunt", hunt))
+    app.add_handler(CommandHandler("mines", mines))
+    app.add_handler(CommandHandler("pick", pick_mine))
+    app.add_handler(CommandHandler("cashout", cashout_mines))
     app.add_handler(CommandHandler("spin", spin))
     app.add_handler(CommandHandler("duel", duel))
     app.add_handler(CommandHandler("duelaccept", duel_accept))
