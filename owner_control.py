@@ -50,7 +50,14 @@ async def owner_command(update, context, owner_id):
         [InlineKeyboardButton("🛠 Maintenance", callback_data="owner:maintenance"),
          InlineKeyboardButton("📜 Action Logs", callback_data="owner:logs")],
     ]
-    await msg.reply_text("👑 PRO REPLY — BOT OWNER CONTROL CENTER\n\nOwner-only control panel", reply_markup=InlineKeyboardMarkup(keyboard))
+    await msg.reply_text(
+        "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 💎\n"
+        "╭━━━━━━━━━━━━━━━━━━━━╮\n"
+        "    👑 𝗢𝗪𝗡𝗘𝗥 𝗖𝗢𝗡𝗧𝗥𝗢𝗟\n"
+        "╰━━━━━━━━━━━━━━━━━━━━╯\n"
+        "🔐 Owner-only control panel",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
 
 
 async def owner_callback(update, context, owner_id):
