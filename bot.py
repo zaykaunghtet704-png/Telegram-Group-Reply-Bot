@@ -31,6 +31,7 @@ from learning import (
     record_conversation, find_learned_reply, list_learned,
     delete_learned, clear_pending,
 )
+from coin_codes import (init_coin_codes, create_coin_code, redeem_coin_code, revoke_coin_code, coin_code_stats)
 from games import (
     init_games, set_games_enabled, game_help, balance, rank, toprank, daily, topcoins,
     quiz, answer, fish, hunt, mines, mine_callback, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
@@ -76,7 +77,7 @@ async def global_access_guard(update, context):
         game_commands = {
             "/games", "/balance", "/rank", "/daily", "/topcoins", "/toprank",
             "/quiz", "/answer", "/fish", "/hunt", "/spin", "/mines",
-            "/pick", "/cashout", "/duel", "/duelaccept", "/dueldecline",
+            "/pick", "/cashout", "/duel", "/duelaccept", "/dueldecline", "/redeem",
             "/game",
         }
         if command in game_commands:
@@ -1242,6 +1243,114 @@ async def set_learn_threshold(update, context):
     await update.effective_message.reply_text("🎯 Learning တူညီမှုအဆင့်ကို " + context.args[0] + "% သတ်မှတ်ပြီးပါပြီ။")
 
 
+async def code_create_command(update, context):
+    user = update.effective_user
+    msg = update.effective_message
+    if not user or user.id != OWNER_ID:
+        await msg.reply_text("⛔ Coin Code ဖန်တီးခွင့်ကို Bot Owner သာ ရရှိပါတယ်။")
+        return
+    if update.effective_chat.type != "private":
+        await msg.reply_text("🔐 Code လုံခြုံရေးအတွက် Bot Private Chat မှာ ဒီ Command ကို သုံးပါ။")
+        return
+    if not context.args or not context.args[0].isdigit():
+        await msg.reply_text(
+            "💎 MYAE COIN CODE STUDIO\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "အသုံးပြုပုံ: /codecreate AMOUNT [USES] [EXPIRY_HOURS]\n\n"
+            "ဥပမာများ:\n"
+            "• /codecreate 5000 — လူတစ်ယောက်သာ ရယူနိုင်\n"
+            "• /codecreate 5000 20 — လူ ၂၀ ရယူနိုင်\n"
+            "• /codecreate 10000 50 24 — လူ ၅၀၊ ၂၄ နာရီအတွင်းသာ\n\n"
+            "အသုံးပြုပြီးသား User တစ်ယောက်က Code တစ်ခုကို ထပ်မံရယူလို့ မရပါ။"
+        )
+        return
+    amount = int(context.args[0])
+    uses = int(context.args[1]) if len(context.args) > 1 and context.args[1].isdigit() else (1 if len(context.args) == 1 else 0)
+    expiry = int(context.args[2]) if len(context.args) > 2 and context.args[2].isdigit() else (0 if len(context.args) < 3 else -1)
+    if not 1 <= amount <= 1_000_000_000 or not 1 <= uses <= 100_000 or not 0 <= expiry <= 8760:
+        await msg.reply_text("❌ Amount 1–1,000,000,000၊ Uses 1–100,000၊ Expiry 0–8760 နာရီ အတွင်း ထည့်ပါ။")
+        return
+    try:
+        code = create_coin_code(amount, uses, user.id, expiry)
+    except Exception:
+        logger.exception("Coin code creation failed")
+        await msg.reply_text("❌ Coin Code ဖန်တီးမရပါ။ Database ကို စစ်ဆေးပါ။")
+        return
+    expiry_text = f"{expiry} နာရီ" if expiry else "သက်တမ်းမကုန်"
+    await msg.reply_text(
+        "✨ 𝗠𝗬𝗔𝗘 • COIN CODE CREATED ✨\n"
+        "╭━━━━━━━━━━━━━━━━━━━━╮\n"
+        f"💎 Reward: +{amount:,} COINS\n"
+        f"🎟️ Uses: {uses:,} ယောက်\n"
+        f"⏳ Expiry: {expiry_text}\n"
+        "╰━━━━━━━━━━━━━━━━━━━━╯\n\n"
+        f"🎁 YOUR CODE\n{code}\n\n"
+        "📩 ဒီ Code ကို Member တွေဆီ ပို့ပေးနိုင်ပါပြီ။\n"
+        "အသုံးပြုရန်: /redeem CODE"
+    )
+
+
+async def redeem_code_command(update, context):
+    user = update.effective_user
+    msg = update.effective_message
+    if not user or not context.args:
+        await msg.reply_text("🎁 Code ရယူရန်: /redeem MYAE-XXXX-XXXX-XXXX")
+        return
+    result = redeem_coin_code(context.args[0], user.id)
+    if not result["ok"]:
+        messages = {
+            "invalid": "❌ ဒီ Coin Code ကို ရှာမတွေ့ပါ။ စာလုံး/နံပါတ် ပြန်စစ်ပါ။",
+            "inactive": "⛔ ဒီ Code ကို ပိတ်ထားပါတယ်။",
+            "expired": "⌛ ဒီ Code သက်တမ်းကုန်သွားပါပြီ။",
+            "used_up": "🎟️ ဒီ Code အသုံးပြုခွင့် ပြည့်သွားပါပြီ။",
+            "already": "⚠️ ဒီ Code ကို သင် အရင်က ရယူပြီးသားပါ။",
+        }
+        await msg.reply_text("💗 MYAE COIN REDEEM\n" + messages.get(result["reason"], "❌ Code အသုံးမပြုနိုင်ပါ။"))
+        return
+    await msg.reply_text(
+        "🎉 𝗖𝗢𝗜𝗡 𝗖𝗢𝗗𝗘 𝗥𝗘𝗗𝗘𝗘𝗠𝗘𝗗! 🎉\n"
+        "╭━━━━━━━━━━━━━━━━━━━━╮\n"
+        f"💎 ရရှိသော Coin: +{result['amount']:,}\n"
+        f"🪙 လက်ကျန် Coin: {result['balance']:,}\n"
+        f"🎟️ Code ကျန်အသုံးပြုခွင့်: {result['remaining']:,}\n"
+        "╰━━━━━━━━━━━━━━━━━━━━╯\n"
+        "💗 မြအေးနဲ့ ဂိမ်းဆက်ဆော့လို့ရပါပြီ။ /games"
+    )
+
+
+async def code_revoke_command(update, context):
+    user = update.effective_user
+    msg = update.effective_message
+    if not user or user.id != OWNER_ID:
+        await msg.reply_text("⛔ Bot Owner သာ Code ပိတ်နိုင်ပါတယ်။")
+        return
+    if update.effective_chat.type != "private":
+        await msg.reply_text("🔐 Private Chat မှာ /coderevoke CODE သုံးပါ။")
+        return
+    if not context.args:
+        await msg.reply_text("အသုံးပြုပုံ: /coderevoke MYAE-XXXX-XXXX-XXXX")
+        return
+    ok = revoke_coin_code(context.args[0])
+    await msg.reply_text("🛑 Coin Code ကို ပိတ်ပြီးပါပြီ။" if ok else "❌ အသုံးပြုနိုင်ဆဲ Code မတွေ့ပါ။")
+
+
+async def code_stats_command(update, context):
+    user = update.effective_user
+    msg = update.effective_message
+    if not user or user.id != OWNER_ID:
+        await msg.reply_text("⛔ Bot Owner သာ စာရင်းကြည့်နိုင်ပါတယ်။")
+        return
+    stats = coin_code_stats()
+    await msg.reply_text(
+        "📊 MYAE COIN CODE STATISTICS\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎟️ ဖန်တီးထားသော Code: {stats['total']:,}\n"
+        f"🟢 အသုံးပြုနိုင်ဆဲ Code: {stats['active']:,}\n"
+        f"👥 Redeem အကြိမ်: {stats['redeemed']:,}\n"
+        f"💎 ဖြန့်ဝေပြီး Coin: {stats['coins_sent']:,}"
+    )
+
+
 async def handle_text(update, context):
     msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
     if not msg or not msg.text or not is_group(chat) or not user or user.is_bot:
@@ -1474,6 +1583,10 @@ async def post_init(app):
         ("ads", "Manage private ad messages"),
         ("help", "Help and commands"),
         ("games", "Group games and coin commands"),
+        ("redeem", "Redeem a promotional coin code"),
+        ("codecreate", "Owner: create coin reward codes"),
+        ("coderevoke", "Owner: disable a coin code"),
+        ("codestats", "Owner: coin code statistics"),
         ("balance", "Show your game coins, level and rank"),
         ("rank", "Show player rank profile"),
         ("toprank", "XP and rank leaderboard"),
@@ -1570,6 +1683,7 @@ def main():
     init_owner_control()
     init_relationship()
     init_games()
+    init_coin_codes()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
@@ -1607,6 +1721,10 @@ def main():
     app.add_handler(CommandHandler("toprank", toprank))
     app.add_handler(CommandHandler("daily", daily))
     app.add_handler(CommandHandler("topcoins", topcoins))
+    app.add_handler(CommandHandler("redeem", redeem_code_command))
+    app.add_handler(CommandHandler("codecreate", code_create_command))
+    app.add_handler(CommandHandler("coderevoke", code_revoke_command))
+    app.add_handler(CommandHandler("codestats", code_stats_command))
     app.add_handler(CommandHandler("quiz", quiz))
     app.add_handler(CommandHandler("answer", answer))
     app.add_handler(CommandHandler("fish", fish))
