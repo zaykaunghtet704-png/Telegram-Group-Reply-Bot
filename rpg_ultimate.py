@@ -298,13 +298,13 @@ async def rpg_ultimate_callback(update, context):
         if not consumed:
             await query.edit_message_text("⌛ ဒီ Treasure ရွေးချယ်မှုကို အသုံးပြုပြီးပါပြီ သို့မဟုတ် သက်တမ်းကုန်သွားပါပြီ။")
             return
-        prize = random.choices([0,500,1200,2500,6000], weights=[18,38,27,14,3], k=1)[0]
+        prize = random.choices([0,500,1200,2500,6000], weights=[35,35,20,8,2], k=1)[0]
         with db() as conn:
             conn.execute("UPDATE game_wallets SET coins=coins+? WHERE user_id=?", (prize,user.id))
             row = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)).fetchone()
             balance = int(row["coins"]) if row else 0
             _sync_legacy(conn, user.id, balance)
-            _add_progress(conn,user.id,8,prize>0)
+            _add_progress(conn,user.id,8,prize>700)
         result = "🪤 ထောင်ချောက်မိသွားတယ်။" if prize == 0 else f"💎 ရတနာတွေ့ပြီ! +{prize:,} Coin"
         await query.edit_message_text(
             f"🗺️ TREASURE RESULT\n📦 Chest {chest.upper()}\n{result}\n🪙 Balance: {balance:,} Coin\n✨ +8 RPG XP",
