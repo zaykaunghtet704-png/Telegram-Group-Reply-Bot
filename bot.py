@@ -74,6 +74,9 @@ async def global_access_guard(update, context):
         }
         if command in game_commands:
             return
+        parts = raw.split(maxsplit=1)
+        if command == "/start" and len(parts) > 1 and parts[1].startswith("game_"):
+            return
         notice = "🛠 Bot ကို Maintenance လုပ်နေပါတယ်။ ခဏနေမှ ပြန်စမ်းပါ။"
     else:
         return
