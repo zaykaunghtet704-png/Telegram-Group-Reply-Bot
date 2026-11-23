@@ -414,8 +414,7 @@ async def toprank(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     with db() as conn:
         rows = conn.execute(
-            "SELECT MAX(display_name) AS display_name,SUM(coins) AS coins,"
-            "SUM(xp) AS xp,SUM(wins) AS wins "
+            "SELECT MAX(display_name) AS display_name,SUM(xp) AS xp,SUM(wins) AS wins "
             "FROM game_accounts GROUP BY user_id "
             "ORDER BY SUM(xp) DESC,SUM(wins) DESC LIMIT 10"
         ).fetchall()
