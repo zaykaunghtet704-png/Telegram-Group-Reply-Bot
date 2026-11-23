@@ -72,7 +72,7 @@ async def global_access_guard(update, context):
         # Keep every group game command and interactive Minefield button usable
         # while unrelated bot features are in maintenance mode.
         query = update.callback_query
-        if query and (query.data or "").startswith("mine:"):
+        if query and (query.data or "").startswith(("mine:", "rpg:")):
             return
         msg = update.effective_message
         raw = (msg.text or "").strip() if msg else ""
