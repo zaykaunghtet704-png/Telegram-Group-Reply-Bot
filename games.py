@@ -729,8 +729,8 @@ async def pick_mine(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "UPDATE game_accounts SET xp=xp+2,losses=losses+1 WHERE chat_id=? AND user_id=?",
                 (chat_id, user.id),
             )
-        record_game_event(user.id, False, 2)
             wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)).fetchone()
+        record_game_event(user.id, False, 2)
         board = "\n".join(
             " ".join("💣" if n in mines_set else ("💎" if n in opened else "❔")
                     for n in range(r * 5 + 1, r * 5 + 6))
