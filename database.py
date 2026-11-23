@@ -3,10 +3,12 @@ import json
 import os
 import re
 import sqlite3
+import threading
 from pathlib import Path
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "replies.db"
@@ -63,8 +65,9 @@ class Cursor:
 
 
 class Connection:
-    def __init__(self, raw):
+    def __init__(self, raw, pool=None):
         self.raw = raw
+        self.pool = pool
 
     def __enter__(self):
         return self
@@ -76,7 +79,10 @@ class Connection:
             else:
                 self.raw.rollback()
         finally:
-            self.raw.close()
+            if self.pool is not None:
+                self.pool.putconn(self.raw)
+            else:
+                self.raw.close()
         return False
 
     def execute(self, sql, params=()):
@@ -155,17 +161,43 @@ class Connection:
         return Cursor(cursor, lastrowid)
 
 
+_POOL = None
+_POOL_LOCK = threading.Lock()
+
+
+def _get_pool():
+    global _POOL
+    if _POOL is None:
+        with _POOL_LOCK:
+            if _POOL is None:
+                if not DATABASE_URL:
+                    raise RuntimeError(
+                        "DATABASE_URL environment variable is missing. Configure PostgreSQL on Render."
+                    )
+                pool = ConnectionPool(
+                    conninfo=DATABASE_URL,
+                    min_size=1,
+                    max_size=12,
+                    timeout=10,
+                    kwargs={"row_factory": dict_row, "connect_timeout": 10},
+                    open=False,
+                )
+                pool.open(wait=True, timeout=10)
+                _POOL = pool
+    return _POOL
+
+
 def connect():
-    if not DATABASE_URL:
-        raise RuntimeError(
-            "DATABASE_URL environment variable is missing. Configure PostgreSQL on Render."
-        )
-    raw = psycopg.connect(
-        DATABASE_URL,
-        row_factory=dict_row,
-        connect_timeout=15,
-    )
-    return Connection(raw)
+    pool = _get_pool()
+    return Connection(pool.getconn(timeout=10), pool)
+
+
+def close_pool():
+    global _POOL
+    with _POOL_LOCK:
+        if _POOL is not None:
+            _POOL.close()
+            _POOL = None
 
 
 def _sqlite_tables(source):
