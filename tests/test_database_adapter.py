@@ -12,6 +12,7 @@ import member_features
 import group_features
 import owner_control
 import relationship
+import rpg
 from database import Connection
 
 
@@ -131,6 +132,7 @@ class DatabaseAdapterTests(unittest.TestCase):
             group_features.init_group_features()
             owner_control.init_owner_control()
             relationship.init_relationship()
+            rpg.init_rpg()
 
         statements = [
             sql
