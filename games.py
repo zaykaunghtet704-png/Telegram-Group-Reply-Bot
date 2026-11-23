@@ -395,3 +395,66 @@ async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         conn.execute("DELETE FROM game_duels WHERE chat_id=?", (chat_id,))
     await update.effective_message.reply_text("🚫 Duel ကို ငြင်းဆိုလိုက်ပါပြီ။")
+
+
+# Only the Bot Owner (OWNER_ID), never group admins, may adjust game coins.
+import os
+
+BOT_OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
+
+
+async def _owner_coin_change(update: Update, context: ContextTypes.DEFAULT_TYPE, direction: int):
+    msg = update.effective_message
+    user = update.effective_user
+    if not user or user.id != BOT_OWNER_ID:
+        await msg.reply_text("⛔ ဒီလုပ်ဆောင်ချက်ကို Bot Owner သာ အသုံးပြုနိုင်ပါတယ်။")
+        return
+    target = msg.reply_to_message.from_user if msg.reply_to_message else None
+    if not target and context.args:
+        raw = context.args[0].lstrip("@")
+        if raw.isdigit():
+            target_id = int(raw)
+            with db() as conn:
+                row = conn.execute(
+                    "SELECT user_id, username, display_name FROM game_accounts WHERE chat_id=? AND user_id=?",
+                    (update.effective_chat.id, target_id),
+                ).fetchone()
+            if row:
+                from telegram import User
+                target = User(id=int(row["user_id"]), first_name=row["display_name"], is_bot=False)
+    amount_index = 1 if context.args and context.args[0].lstrip("@").isdigit() and not msg.reply_to_message else 0
+    if not target and msg.reply_to_message:
+        target = msg.reply_to_message.from_user
+    if not target or target.is_bot or target.id == BOT_OWNER_ID:
+        await msg.reply_text(
+            "အသုံးပြုပုံ:\n"
+            "• Member ရဲ့ Message ကို Reply လုပ်ပြီး /addcoins 500 သို့ /takecoins 500\n"
+            "• သို့မဟုတ် /addcoins USER_ID 500"
+        )
+        return
+    if len(context.args) <= amount_index or not context.args[amount_index].isdigit():
+        await msg.reply_text("Coin ပမာဏကို အပေါင်းကိန်းပြည့်နဲ့ ထည့်ပါ။ ဥပမာ: /addcoins 500")
+        return
+    amount = int(context.args[amount_index])
+    if amount < 1 or amount > 1_000_000_000:
+        await msg.reply_text("Coin ပမာဏသည် 1 မှ 1,000,000,000 အတွင်း ဖြစ်ရပါမယ်။")
+        return
+    chat_id = update.effective_chat.id
+    account = _account(chat_id, target)
+    if direction < 0 and int(account["coins"]) < amount:
+        await msg.reply_text(f"❌ လက်ကျန် Coin မလုံလောက်ပါ။ လက်ကျန်: {account['coins']:,}")
+        return
+    result = _change(chat_id, target, coins=direction * amount)
+    verb = "ထည့်ပေးလိုက်ပါပြီ" if direction > 0 else "နှုတ်ယူလိုက်ပါပြီ"
+    await msg.reply_text(
+        f"✅ {result['display_name']} ကို {amount:,} Coin {verb}။\n"
+        f"🪙 လက်ကျန်: {result['coins']:,} Coin"
+    )
+
+
+async def addcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _owner_coin_change(update, context, 1)
+
+
+async def takecoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _owner_coin_change(update, context, -1)
