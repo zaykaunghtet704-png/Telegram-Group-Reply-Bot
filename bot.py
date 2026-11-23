@@ -823,23 +823,35 @@ async def member_update(update, context):
     chat = update.effective_chat
     if not msg or not is_group(chat):
         return
-    settings = get_settings(chat.id)
-    if msg.new_chat_members and settings["welcome_enabled"]:
-        for member in msg.new_chat_members:
-            if not member.is_bot:
-                try:
-                    count = await context.bot.get_chat_member_count(chat.id)
-                except TelegramError:
-                    count = 0
-                rendered = render_member_message(settings["welcome_text"], member, chat, count)
-                await msg.reply_text(rendered)
-    if msg.left_chat_member and settings["goodbye_enabled"] and not msg.left_chat_member.is_bot:
-        try:
-            count = await context.bot.get_chat_member_count(chat.id)
-        except TelegramError:
-            count = 0
-        rendered = render_member_message(settings["goodbye_text"], msg.left_chat_member, chat, count)
-        await msg.reply_text(rendered)
+    # Keep an explicit trace so missed Telegram service updates can be diagnosed in Render logs.
+    if msg.new_chat_members:
+        logger.info("New-member service update received: chat_id=%s count=%s", chat.id, len(msg.new_chat_members))
+    if msg.left_chat_member:
+        logger.info("Left-member service update received: chat_id=%s user_id=%s", chat.id, msg.left_chat_member.id)
+    try:
+        settings = get_settings(chat.id)
+        if msg.new_chat_members and settings["welcome_enabled"]:
+            for member in msg.new_chat_members:
+                if not member.is_bot:
+                    try:
+                        count = await context.bot.get_chat_member_count(chat.id)
+                    except TelegramError:
+                        logger.exception("Could not get member count for welcome: chat_id=%s", chat.id)
+                        count = 0
+                    rendered = render_member_message(settings["welcome_text"], member, chat, count)
+                    await msg.reply_text(rendered)
+                    logger.info("Welcome message sent: chat_id=%s user_id=%s", chat.id, member.id)
+        if msg.left_chat_member and settings["goodbye_enabled"] and not msg.left_chat_member.is_bot:
+            try:
+                count = await context.bot.get_chat_member_count(chat.id)
+            except TelegramError:
+                logger.exception("Could not get member count for goodbye: chat_id=%s", chat.id)
+                count = 0
+            rendered = render_member_message(settings["goodbye_text"], msg.left_chat_member, chat, count)
+            await msg.reply_text(rendered)
+            logger.info("Goodbye message sent: chat_id=%s user_id=%s", chat.id, msg.left_chat_member.id)
+    except Exception:
+        logger.exception("Welcome/Goodbye handler failed: chat_id=%s", chat.id)
 
 
 async def bot_membership_update(update, context):
@@ -1510,7 +1522,7 @@ def main():
     app.add_handler(ChatMemberHandler(bot_membership_update, ChatMemberHandler.MY_CHAT_MEMBER))
     app.add_handler(MessageHandler((filters.TEXT & ~filters.COMMAND) | filters.CAPTION, lambda u, ctx: moderate_content(u, ctx, OWNER_ID)), group=-2)
     app.add_handler(MessageHandler((filters.TEXT & ~filters.COMMAND) | filters.CAPTION, lambda u, ctx: moderate_message(u, ctx, OWNER_ID), block=False), group=-1)
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, member_update))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, member_update), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     webhook_path = hashlib.sha256(BOT_TOKEN.encode("utf-8")).hexdigest()
