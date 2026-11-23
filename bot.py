@@ -55,6 +55,8 @@ logging.basicConfig(
 logger = logging.getLogger("pro-reply-bot")
 FLOOD_TRACKER = defaultdict(deque)
 GROUP_LAST_REPLY = defaultdict(float)
+SMART_CHAT_LAST_REPLY = defaultdict(float)
+SMART_USER_LAST_REPLY = defaultdict(float)
 
 
 async def global_access_guard(update, context):
@@ -1405,7 +1407,36 @@ async def code_stats_command(update, context):
     )
 
 
+def smart_conversation_reply(text):
+    """Return a short, context-aware Burmese reply for clear conversational cues."""
+    value = " ".join((text or "").casefold().split())
+    intents = [
+        (("မင်္ဂလာပါ", "ဟယ်လို", "hello", "hi ", "ဟိုင်း", "နေကောင်းလား"),
+         ["မင်္ဂလာပါရှင် 💗 အားလုံးပဲ နေကောင်းကြလား။", "ဟယ်လိုပါ 🥰 မြအေးလည်း ဒီမှာရှိတယ်နော်။"]),
+        (("ကျေးဇူး", "thank you", "thanks", "thx"),
+         ["ရပါတယ်ရှင် 💗 ကူညီနိုင်လို့ ဝမ်းသာပါတယ်။", "အေးဆေးပါနော် 🥰"]),
+        (("ပျင်း", "bored", "ပျင်းတယ်"),
+         ["ပျင်းနေရင် Quiz လေးဖြေမလား 😄 /games မှာ ဂိမ်းတွေရှိတယ်နော်။", "ဒါဆို အားလုံးနဲ့ စကားပြောကြမယ်လေ 💗"]),
+        (("ဟားဟား", "ဟာဟ", "😂", "🤣", "lol", "lmao"),
+         ["ဟားဟား 😂 ဒီ Group က ပျော်စရာကြီးပဲနော်။", "အဲဒါတော့ ရယ်ရတယ်နော် 🤣"]),
+        (("စိတ်ညစ်", "ဝမ်းနည်း", "sad", "စိတ်မကောင်း"),
+         ["အဆင်မပြေတာရှိရင် ဖြည်းဖြည်းချင်း ပြောလို့ရပါတယ်နော် 💗", "အားတင်းထားပါနော်။ အားလုံး အဆင်ပြေလာမှာပါ 🫶"]),
+        (("ဘာလုပ်", "ဘာတွေလုပ်", "what are you doing"),
+         ["မြအေးက ဒီမှာ အားလုံးနဲ့ စကားပြောဖို့ စောင့်နေတာပါ 😄", "Group ကို စောင့်ကြည့်ပြီး ကူညီပေးနေတာပါရှင် 💗"]),
+    ]
+    for keywords, replies in intents:
+        if any(word in value for word in keywords):
+            return random.choice(replies)
+    if "?" in value or "？" in value or "လား" in value or "ဘယ်လို" in value:
+        return random.choice([
+            "စိတ်ဝင်စားစရာ မေးခွန်းလေးပဲနော် 🤔 အဖွဲ့ဝင်တွေထဲမှာ သိတဲ့သူရှိလား။",
+            "မြအေးလည်း သိချင်တယ်ရှင် 😄 ဘယ်သူဖြေပေးနိုင်မလဲ။",
+        ])
+    return None
+
+
 async def handle_text(update, context):
+
     msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
     if not msg or not msg.text or not is_group(chat) or not user or user.is_bot:
         return
@@ -1423,6 +1454,43 @@ async def handle_text(update, context):
 
     s = get_settings(chat.id)
     now = time.time()
+
+    # Smart conversation works independently from /autoreply and /learn.
+    # It is intentionally stateless: ordinary group messages are not saved.
+    replied_to_bot = bool(
+        msg.reply_to_message
+        and msg.reply_to_message.from_user
+        and context.bot.id == msg.reply_to_message.from_user.id
+    )
+    mentioned_bot = any(
+        entity.type == "mention" and (msg.text or "").casefold().find("@") >= 0
+        for entity in (msg.entities or [])
+    )
+    smart_reply = smart_conversation_reply(msg.text)
+    if replied_to_bot and not smart_reply:
+        smart_reply = "ဟုတ်ကဲ့ရှင် 💗 မြအေး နားထောင်နေပါတယ်။ ဆက်ပြောပါနော်။"
+    if smart_reply:
+        last_chat = SMART_CHAT_LAST_REPLY[chat.id]
+        last_user = SMART_USER_LAST_REPLY[(chat.id, user.id)]
+        if now - last_chat >= 45 and now - last_user >= 90:
+            await msg.reply_text(smart_reply, reply_to_message_id=msg.message_id)
+            SMART_CHAT_LAST_REPLY[chat.id] = now
+            SMART_USER_LAST_REPLY[(chat.id, user.id)] = now
+            return
+    elif len(msg.text.strip()) >= 12 and random.random() < 0.02:
+        # Very occasional friendly presence, with a longer group-wide cooldown.
+        if now - SMART_CHAT_LAST_REPLY[chat.id] >= 180:
+            await msg.reply_text(
+                random.choice([
+                    "ဒီ Group မှာ စကားဝိုင်းလေးက စည်ကားနေတာပဲ 😄",
+                    "အားလုံး စကားပြောလို့ရပါတယ်နော်။ မြအေး ဒီမှာရှိတယ် 💗",
+                ]),
+                reply_to_message_id=msg.message_id,
+            )
+            SMART_CHAT_LAST_REPLY[chat.id] = now
+            SMART_USER_LAST_REPLY[(chat.id, user.id)] = now
+            return
+
     limit = int(s.get("flood_limit", 0))
     if s["enabled"] and limit:
         queue = FLOOD_TRACKER[(chat.id, user.id)]
