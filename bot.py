@@ -31,6 +31,10 @@ from learning import (
     record_conversation, find_learned_reply, list_learned,
     delete_learned, clear_pending,
 )
+from games import (
+    init_games, set_games_enabled, game_help, balance, daily, topcoins,
+    quiz, answer, fish, hunt, spin, duel, duel_accept, duel_decline,
+)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
@@ -167,6 +171,20 @@ async def require_admin(update, context):
         await update.effective_message.reply_text("Group Admin များသာ အသုံးပြုနိုင်ပါတယ်။")
         return False
     return True
+
+
+async def game_toggle(update, context):
+    if not await require_admin(update, context):
+        return
+    if not context.args or context.args[0].lower() not in ("on", "off"):
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /game on သို့မဟုတ် /game off")
+        return
+    enabled = context.args[0].lower() == "on"
+    set_games_enabled(update.effective_chat.id, enabled)
+    await update.effective_message.reply_text(
+        "🎮 Group Game ဖွင့်ပြီးပါပြီ။ /games ဖြင့် Command ကြည့်ပါ။"
+        if enabled else "⛔ Group Game ပိတ်ပြီးပါပြီ။"
+    )
 
 
 def media_from_message(message):
@@ -425,6 +443,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/setlang my|en|both — Help language\n"
             "/setgroupcooldown 0-3600 — Group cooldown\n"
             "/setflood 0-30 — Flood reply limit\n\n"
+            "🎮 GROUP GAMES & COINS\n"
+            "/games /balance /daily /topcoins\n"
+            "/quiz /answer 1-4 /fish /hunt /spin\n"
+            "/duel (reply) /duelaccept /dueldecline /game on|off (admin)\n\n"
             "🛡️ SECURITY & MODERATION\n"
             "/security on|off — Master security switch\n"
             "/antilink on|off — Link filter\n"
@@ -533,6 +555,18 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/rules — Group စည်းကမ်းကြည့်ရန်\n"
         "/lock — Group စာပို့ခွင့်ပိတ်ရန် (Admin)\n"
         "/unlock — Group စာပို့ခွင့်ဖွင့်ရန် (Admin)\n\n"
+        "🎮 Group Games & Coin Commands:\n"
+        "/games — ဂိမ်း Command စာရင်း\n"
+        "/balance — Coin / Level ကြည့်ရန်\n"
+        "/daily — နေ့စဉ် Coin 50 ယူရန်\n"
+        "/topcoins — Coin Top 10\n"
+        "/quiz /answer 1-4 — Quiz Battle\n"
+        "/fish — ငါးဖမ်းရန်\n"
+        "/hunt — Monster တိုက်ရန်\n"
+        "/spin — Lucky Spin (12 နာရီတစ်ကြိမ်)\n"
+        "/duel — Reply လုပ်ပြီး Duel စိန်ခေါ်ရန်\n"
+        "/duelaccept /dueldecline — Duel လက်ခံ/ငြင်းရန်\n"
+        "/game on|off — Admin: ဂိမ်းဖွင့်/ပိတ်ရန်\n\n"
         "Keyword ပါဝင်တဲ့ Group စာကို Bot က သတ်မှတ်ထားတဲ့ Reply ဖြင့် ပြန်ဖြေပါမယ်။"
     )
     await update.effective_message.reply_text(text)
@@ -1365,6 +1399,19 @@ async def post_init(app):
         ("adstats", "Bot Owner: advertising targets"),
         ("ads", "Manage private ad messages"),
         ("help", "Help and commands"),
+        ("games", "Group games and coin commands"),
+        ("balance", "Show your game coins and level"),
+        ("daily", "Claim daily game coins"),
+        ("topcoins", "Group coin leaderboard"),
+        ("quiz", "Start a group quiz"),
+        ("answer", "Answer the active quiz"),
+        ("fish", "Go fishing for coins"),
+        ("hunt", "Fight a monster for rewards"),
+        ("spin", "Use the lucky spin"),
+        ("duel", "Challenge a member to a duel"),
+        ("duelaccept", "Accept a duel challenge"),
+        ("dueldecline", "Decline a duel challenge"),
+        ("game", "Admin: enable or disable group games"),
         ("panel", "Admin dashboard"),
         ("addreply", "Add keyword reply"),
         ("editreply", "Edit a saved reply"),
@@ -1443,6 +1490,7 @@ def main():
     init_group_features()
     init_owner_control()
     init_relationship()
+    init_games()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
@@ -1473,6 +1521,19 @@ def main():
     app.add_handler(MessageHandler(filters.ALL, track_chats), group=-10)
     app.add_handler(MessageHandler(filters.ALL, check_afk_mention), group=-9)
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("games", game_help))
+    app.add_handler(CommandHandler("balance", balance))
+    app.add_handler(CommandHandler("daily", daily))
+    app.add_handler(CommandHandler("topcoins", topcoins))
+    app.add_handler(CommandHandler("quiz", quiz))
+    app.add_handler(CommandHandler("answer", answer))
+    app.add_handler(CommandHandler("fish", fish))
+    app.add_handler(CommandHandler("hunt", hunt))
+    app.add_handler(CommandHandler("spin", spin))
+    app.add_handler(CommandHandler("duel", duel))
+    app.add_handler(CommandHandler("duelaccept", duel_accept))
+    app.add_handler(CommandHandler("dueldecline", duel_decline))
+    app.add_handler(CommandHandler("game", game_toggle))
     app.add_handler(CommandHandler("panel", panel))
     app.add_handler(CommandHandler("addreply", add_reply))
     app.add_handler(CommandHandler("editreply", edit_reply))
