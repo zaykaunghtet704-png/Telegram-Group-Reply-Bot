@@ -359,7 +359,7 @@ async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     launch_url = f"https://t.me/{bot_username}?start=game_{chat_id}"
     await update.effective_message.reply_text(_hud_text(
-        "🎮 NEXUS GAME HUB • ELITE ARENA\n"
+        "💗 မြအေး GAME HUB • ELITE ARENA\n"
         "╔════════════════════════════╗\n"
         "   🪙 COIN • ⚡ XP • 👑 RANK\n"
         "╚════════════════════════════╝\n"
