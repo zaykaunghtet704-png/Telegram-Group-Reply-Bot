@@ -219,7 +219,7 @@ async def mission_claim_command(update, context):
             (int(wallet["coins"]), user.id),
         )
     await update.effective_message.reply_text(
-        f"🎉 MISSION REWARD CLAIMED!\n+{mission['reward']:,} Coin\n🪙 လက်ကျန် {int(wallet['coins']):,} Coin"
+        f"🎉 MISSION REWARD CLAIMED!\n+{mission['reward']:,} Coin\n💰 လက်ကျန် {int(wallet['coins']):,} Coin"
     )
 
 
@@ -271,7 +271,7 @@ async def buy_command(update, context):
             (item["price"], user.id, item["price"]),
         )
         if debit.rowcount != 1:
-            await update.effective_message.reply_text("🪙 Coin မလုံလောက်ပါ။ /balance စစ်ပါ။")
+            await update.effective_message.reply_text("💰 Coin မလုံလောက်ပါ။ /balance စစ်ပါ။")
             return
         conn.execute(
             """INSERT INTO rpg_inventory(user_id,item_id,quantity) VALUES(?,?,1)
@@ -281,7 +281,7 @@ async def buy_command(update, context):
         wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)).fetchone()
         conn.execute("UPDATE game_accounts SET coins=? WHERE user_id=?", (int(wallet["coins"]), user.id))
     await update.effective_message.reply_text(
-        f"✅ ဝယ်ယူပြီးပါပြီ!\n{item['emoji']} {item['name']}\n🪙 လက်ကျန် {int(wallet['coins']):,} Coin\n/equip {item_id} ဖြင့် တပ်ဆင်ပါ။"
+        f"✅ ဝယ်ယူပြီးပါပြီ!\n{item['emoji']} {item['name']}\n💰 လက်ကျန် {int(wallet['coins']):,} Coin\n/equip {item_id} ဖြင့် တပ်ဆင်ပါ။"
     )
 
 
@@ -382,7 +382,7 @@ async def rpg_daily_command(update, context):
     await update.effective_message.reply_text(
         "╭━━ 💗 MYAE RPG DAILY ━━╮\n"
         f"🔥 Login Streak: {streak} day(s)\n"
-        f"🪙 Reward: +{coins:,} Coins\n"
+        f"💰 Reward: +{coins:,} Coins\n"
         f"✨ RPG XP: +{xp} XP\n"
         f"💰 Wallet: {int(wallet['coins']):,} Coins\n"
         "╰━━━━━━━━━━━━━━━━━━╯\n"
@@ -461,7 +461,7 @@ async def adventure_command(update, context):
     record_game_event(user.id, won, xp)
     balance = int(wallet["coins"]) if wallet else 0
     result = "🏆 VICTORY!" if won else "💥 DEFEAT!"
-    reward_line = f"🪙 Coin Reward: +{reward:,}" if reward else "🪙 Coin Reward: +0"
+    reward_line = f"💰 Coin Reward: +{reward:,}" if reward else "💰 Coin Reward: +0"
     await update.effective_message.reply_text(
         "╭━━ ⚔️ MYAE DUNGEON ━━╮\n"
         f"👤 Adventurer: {user.full_name}\n"
