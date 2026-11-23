@@ -251,11 +251,12 @@ def _hud_text(value):
     )
 
 
-async def _animate_hud(message, frames, delay=0.55):
-    """Edit one Telegram message through short game-animation frames."""
-    for frame in frames:
-        await message.edit_text(_hud_text(frame))
-        await asyncio.sleep(delay)
+async def _animate_hud(message, frames, delay=0.12):
+    """Use one brief animation frame to keep busy group games responsive."""
+    if frames:
+        await message.edit_text(_hud_text(frames[0]))
+        if delay > 0:
+            await asyncio.sleep(min(delay, 0.12))
 
 def _level(xp):
     return 1 + int(max(0, xp) // 100)
