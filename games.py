@@ -695,7 +695,69 @@ async def mine_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def pick_mine(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await mines(update, context)
+    if not await _ready(update):
+        return
+    if not context.args or not context.args[0].isdigit() or not 1 <= int(context.args[0]) <= 25:
+        await update.effective_message.reply_text(_hud_text("အသုံးပြုပုံ: /pick 1 မှ 25 အတွင်း အကွက်နံပါတ်"))
+        return
+    chat_id, user = update.effective_chat.id, update.effective_user
+    cell = int(context.args[0])
+    with db() as conn:
+        game = conn.execute(
+            "SELECT * FROM game_mines WHERE chat_id=? AND user_id=?",
+            (chat_id, user.id),
+        ).fetchone()
+    if not game:
+        await update.effective_message.reply_text(_hud_text("💣 Active Mine Game မရှိပါ။ /mines 100 ဖြင့် စတင်ပါ။"))
+        return
+    mines_set = set(json.loads(game["mines"]))
+    opened = set(json.loads(game["opened"]))
+    if cell in opened:
+        await update.effective_message.reply_text(_hud_text("ဒီအကွက်ကို ဖွင့်ပြီးသားပါ။ အခြားအကွက်ရွေးပါ။"))
+        return
+    if cell in mines_set:
+        with db() as conn:
+            conn.execute("DELETE FROM game_mines WHERE chat_id=? AND user_id=?", (chat_id, user.id))
+            conn.execute(
+                "UPDATE game_accounts SET xp=xp+2,losses=losses+1 WHERE chat_id=? AND user_id=?",
+                (chat_id, user.id),
+            )
+            wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)).fetchone()
+        board = "\\n".join(
+            " ".join("💣" if n in mines_set else ("💎" if n in opened else "❔")
+                    for n in range(r * 5 + 1, r * 5 + 6))
+            for r in range(5)
+        )
+        balance_now = int(wallet["coins"]) if wallet else 0
+        await update.effective_message.reply_text(_hud_text(
+            f"💥 BOOM! MINE HIT! • #{cell}\\n{board}\\n"
+            f"📉 Bet ဆုံးရှုံး: {int(game['bet']):,} Coin\\n⭐ +2 XP"
+            f"\\n🪙 လက်ကျန်: {balance_now:,} Coin"
+        ))
+        return
+    opened.add(cell)
+    with db() as conn:
+        conn.execute(
+            "UPDATE game_mines SET opened=? WHERE chat_id=? AND user_id=?",
+            (json.dumps(sorted(opened)), chat_id, user.id),
+        )
+        wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)).fetchone()
+    multiplier = _mine_multiplier(len(opened))
+    payout = int(int(game["bet"]) * multiplier)
+    board = "\\n".join(
+        " ".join("💎" if n in opened else "❔" for n in range(r * 5 + 1, r * 5 + 6))
+        for r in range(5)
+    )
+    balance_now = int(wallet["coins"]) if wallet else 0
+    await update.effective_message.reply_text(
+        _hud_text(
+            f"💎 SAFE PICK! • #{cell}\\n{board}\\n"
+            f"✅ Safe: {len(opened)} | 📈 Multiplier: {multiplier:g}x"
+            f"\\n💰 Cashout: {payout:,} Coin | 🪙 လက်ကျန်: {balance_now:,}"
+            f"\\nနောက်အကွက် /pick 1-25 သို့မဟုတ် /cashout"
+        ),
+        reply_markup=_mine_keyboard(user.id, opened),
+    )
 
 
 async def cashout_mines(update: Update, context: ContextTypes.DEFAULT_TYPE):
