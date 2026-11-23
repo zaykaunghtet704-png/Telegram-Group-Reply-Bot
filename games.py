@@ -267,17 +267,16 @@ async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     launch_url = f"https://t.me/{bot_username}?start=game_{chat_id}"
     await update.effective_message.reply_text(_hud_text(
-        "🎮 NEXUS 3D GAME HUB\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "3D World ထဲမှာ Character ကို Joystick နဲ့ လှုပ်ရှားပြီး ကစားနိုင်ပါပြီ။\n\n"
-        "🎣 Fishing · ⚔️ Monster Hunt\n"
-        "🧠 Quiz Battle · 🎰 Lucky Spin\n📚 Quiz Bank: 20,000 Questions\n"
-        "🥊 1v1 Duel — Group Member နဲ့ စိန်ခေါ်ကစားရန်\n\n"
-        "🪙 Group Coin / Level / XP ကို လက်ရှိ Bot Database နဲ့ ချိတ်ဆက်ထားပါတယ်။\n"
-        "အောက်ကခလုတ်ကိုနှိပ်ပြီး Bot Private Chat ထဲမှာ Game ကိုဖွင့်ပါ။"),
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎮 Open 3D Game", url=launch_url)]])
-    )
-
+        "🎮 NEXUS GAME HUB • COIN ARENA\n━━━━━━━━━━━━━━━━━━\n"
+        "🪙 ဂိမ်းကစားရန် Coin လောင်းကြေးထည့်ပါ။ နိုင်ရင် payout + XP၊ ရှုံးရင် bet ဆုံးမယ်။\n\n"
+        "🧠 /quiz 100 — Quiz ဝင်ကစား\n/answer 1 — အဖြေဖြေ\n"
+        "🎣 /fish 100 — ငါးဖမ်း\n⚔️ /hunt 100 — Monster Hunt\n"
+        "🎰 /spin 100 — Slot Machine\n🥊 Member ကို Reply + /duel 100 — Duel\n\n"
+        "👤 /balance — Coin / Level / Rank\n🏅 /rank — ကိုယ့် Rank (Member ကို Reply လုပ်လည်းရ)\n"
+        "🏆 /topcoins — Coin Top 10\n👑 /toprank — XP / Rank Top 10\n"
+        "🎁 /daily — နေ့စဉ် Coin Reward\n\n"
+        "📚 Quiz Bank: 20,000 Questions\n🧬 Level တစ်ဆင့်တက်ရန် 100 XP လိုအပ်သည်။"
+    ), reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎮 Open 3D Web Game", url=launch_url)]]))
 
 async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
