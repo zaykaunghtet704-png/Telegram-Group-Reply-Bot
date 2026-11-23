@@ -220,7 +220,7 @@ def _expire_quiz(chat_id):
         ).fetchall()
         for player in players:
             conn.execute(
-                "UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?",
+                "UPDATE game_accounts SET losses=losses+1,xp=xp+1 WHERE chat_id=? AND user_id=?",
                 (chat_id, int(player["user_id"])),
             )
         conn.execute("DELETE FROM game_quiz_players WHERE chat_id=?", (chat_id,))
