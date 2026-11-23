@@ -82,18 +82,38 @@ async def moderate_message(update, context, owner_id):
         return
     text=msg.text or msg.caption or ""
     reason=None
-    if cfg["anti_link"] and contains_link(text): reason="Link ခွင့်မပြုပါ"
+    entities=(msg.entities or []) + (msg.caption_entities or [])
+    hidden_link=any(getattr(entity,"type","") in ("url","text_link") or getattr(entity,"url",None) for entity in entities)
+    if cfg["anti_link"] and (contains_link(text) or hidden_link):
+        reason="Link ခွင့်မပြုပါ"
     if text:
         with _db() as c:
             words=[row["word"] for row in c.execute("SELECT word FROM blocked_words WHERE chat_id=?",(chat.id,)).fetchall()]
         matched=next((word for word in words if word and word in text.casefold()),None)
         if matched: reason="ခွင့်မပြုထားသော စာသား ပါဝင်နေပါသည်"
     if cfg["anti_spam"]:
+        media_signature=""
+        if msg.photo:
+            media_signature="photo:"+msg.photo[-1].file_unique_id
+        elif msg.animation:
+            media_signature="animation:"+msg.animation.file_unique_id
+        elif msg.video:
+            media_signature="video:"+msg.video.file_unique_id
+        elif msg.sticker:
+            media_signature="sticker:"+msg.sticker.file_unique_id
+        elif msg.voice:
+            media_signature="voice:"+msg.voice.file_unique_id
+        elif msg.audio:
+            media_signature="audio:"+msg.audio.file_unique_id
+        elif msg.document:
+            media_signature="document:"+msg.document.file_unique_id
+        spam_content=text or media_signature
         now=time.time(); key=(chat.id,user.id); q=SPAM_WINDOW[key]
         while q and now-q[0][0]>12: q.popleft()
-        normalized=" ".join(text.casefold().split())
+        normalized=" ".join(spam_content.casefold().split())
         if normalized and any(item[1]==normalized for item in q): reason="ထပ်ခါထပ်ခါ စာပို့ခြင်း (Spam)"
-        q.append((now,normalized))
+        if normalized:
+            q.append((now,normalized))
     if reason:
         try:
             await msg.delete()
