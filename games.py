@@ -171,7 +171,7 @@ async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "3D World ထဲမှာ Character ကို Joystick နဲ့ လှုပ်ရှားပြီး ကစားနိုင်ပါပြီ။\n\n"
         "🎣 Fishing · ⚔️ Monster Hunt\n"
         "🧠 Quiz Battle · 🎰 Lucky Spin\n"
-        "🥊 1v1 Duel (Arena အဆင့်ဆင့် ဖွံ့ဖြိုးနေဆဲ)\n\n"
+        "🥊 1v1 Duel — Group Member နဲ့ စိန်ခေါ်ကစားရန်\n\n"
         "🪙 Group Coin / Level / XP ကို လက်ရှိ Bot Database နဲ့ ချိတ်ဆက်ထားပါတယ်။\n"
         "အောက်ကခလုတ်ကိုနှိပ်ပြီး Bot Private Chat ထဲမှာ Game ကိုဖွင့်ပါ။",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎮 Open 3D Game", url=launch_url)]])
