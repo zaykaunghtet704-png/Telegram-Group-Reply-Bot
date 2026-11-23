@@ -205,13 +205,30 @@ def _account(chat_id, user):
         ).fetchone()
 
 
+def _wallet_adjust(conn, user_id, amount):
+    """Atomically adjust one user's global wallet and mirror its balance to legacy rows."""
+    row = conn.execute(
+        "UPDATE game_wallets SET coins=GREATEST(0,coins+?) WHERE user_id=? RETURNING coins",
+        (int(amount), int(user_id)),
+    ).fetchone()
+    if not row:
+        return None
+    balance = int(row["coins"])
+    conn.execute(
+        "UPDATE game_accounts SET coins=? WHERE user_id=? AND coins<>?",
+        (balance, int(user_id), balance),
+    )
+    return balance
+
+
 def _change(chat_id, user, coins=0, xp=0, wins=0, losses=0):
     _account(chat_id, user)
     with db() as conn:
+        _wallet_adjust(conn, user.id, int(coins))
         conn.execute(
-            "UPDATE game_accounts SET coins=GREATEST(0,coins+?), xp=xp+?, wins=wins+?, losses=losses+? "
+            "UPDATE game_accounts SET xp=xp+?, wins=wins+?, losses=losses+? "
             "WHERE chat_id=? AND user_id=?",
-            (int(coins), int(xp), int(wins), int(losses), chat_id, user.id),
+            (int(xp), int(wins), int(losses), chat_id, user.id),
         )
         return conn.execute(
             "SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",
@@ -422,14 +439,11 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text(_hud_text(f"⏳ Daily Reward ပြန်ယူရန် {hours} နာရီ {minutes} မိနစ် စောင့်ပါ။"))
         return
     with db() as conn:
+        _wallet_adjust(conn, user.id, DAILY_COINS)
+        conn.execute("UPDATE game_wallets SET last_daily=? WHERE user_id=?", (now, user.id))
         conn.execute(
-            "UPDATE game_wallets SET coins=coins+?, last_daily=? WHERE user_id=?",
-            (DAILY_COINS, now, user.id),
-        )
-        conn.execute(
-            "UPDATE game_accounts SET coins=(SELECT coins FROM game_wallets WHERE user_id=?), "
-            "last_daily=? WHERE user_id=?",
-            (user.id, now, user.id),
+            "UPDATE game_accounts SET last_daily=? WHERE user_id=?",
+            (now, user.id),
         )
         conn.execute(
             "UPDATE game_accounts SET xp=xp+10 WHERE chat_id=? AND user_id=?",
@@ -512,7 +526,8 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for p in players:
             if int(p["user_id"])!=user.id: conn.execute("UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?",(chat_id,int(p["user_id"])))
         payout=int(player["bet"])*2
-        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+25,wins=wins+1 WHERE chat_id=? AND user_id=?",(payout,chat_id,user.id))
+        _wallet_adjust(conn, user.id, payout)
+        conn.execute("UPDATE game_accounts SET xp=xp+25,wins=wins+1 WHERE chat_id=? AND user_id=?",(chat_id,user.id))
         row=conn.execute("SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
     m=await update.effective_message.reply_text(_hud_text("🧠 QUIZ RESULT\n🏆 Winner detected..."))
     await _animate_hud(m,["🔓 REWARD UNLOCKED!","🎉 CORRECT ANSWER!"],0.35)
@@ -532,7 +547,8 @@ async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     m=await update.effective_message.reply_text(_hud_text("🎣 NEXUS FISHING ZONE\n🌊 ငါးမျှားချိတ်ချလိုက်ပြီ..."))
     await _animate_hud(m,["🌊 ရေပြင်လှုပ်ရှားနေသည်...","🐟 ငါးချိတ်မိပြီ! 💦 SPLASH!","⬆️ ငါးကိုဆွဲတင်နေသည်..."],0.5)
     with db() as conn:
-        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+?,wins=wins+?,losses=losses+? WHERE chat_id=? AND user_id=?",(payout,5 if won else 3,1 if won else 0,0 if won else 1,chat_id,user.id))
+        _wallet_adjust(conn, user.id, payout)
+        conn.execute("UPDATE game_accounts SET xp=xp+?,wins=wins+?,losses=losses+? WHERE chat_id=? AND user_id=?",(5 if won else 3,1 if won else 0,0 if won else 1,chat_id,user.id))
         row=conn.execute("SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
     await m.edit_text(_hud_text(f"🎣 FISHING RESULT • {'🏆 WIN' if won else '💥 LOSS'}\n🐠 {name} | {mult:g}x\n🎯 Bet: {bet:,}\n💰 ပြန်ရငွေ: {payout:,} Coin\n⭐ XP +{5 if won else 3}\n🪙 လက်ကျန်: {row['coins']:,}"))
 
@@ -549,7 +565,8 @@ async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     m=await update.effective_message.reply_text(_hud_text(f"⚔️ MONSTER HUNT\n👹 {monster}\n⚡ BATTLE START!"))
     await _animate_hud(m,[f"👹 {monster} ပေါ်လာပြီ!\n🛡️ DEFEND!","🗡️ PLAYER ATTACK!\n💥 CLASH!","🔥 FINAL STRIKE!\n⚡ FINISH MOVE!"],0.55)
     with db() as conn:
-        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+?,wins=wins+?,losses=losses+? WHERE chat_id=? AND user_id=?",(payout,20 if won else 5,1 if won else 0,0 if won else 1,chat_id,user.id))
+        _wallet_adjust(conn, user.id, payout)
+        conn.execute("UPDATE game_accounts SET xp=xp+?,wins=wins+?,losses=losses+? WHERE chat_id=? AND user_id=?",(20 if won else 5,1 if won else 0,0 if won else 1,chat_id,user.id))
         row=conn.execute("SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
     await m.edit_text(_hud_text(f"⚔️ HUNT RESULT • {'🏆 VICTORY' if won else '💥 DEFEAT'}\n👹 {monster}\n{'💰 Payout: '+format(payout,',')+' Coin (2x)' if won else '📉 Bet lost: '+format(bet,',')+' Coin'}\n⭐ XP +{20 if won else 5}\n🪙 Balance: {row['coins']:,}"))
 
@@ -666,8 +683,9 @@ async def mine_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         payout = int(int(game["bet"]) * multiplier)
         with db() as conn:
             conn.execute("DELETE FROM game_mines WHERE chat_id=? AND user_id=?", (chat_id, owner_id))
-            conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+?,wins=wins+1 WHERE chat_id=? AND user_id=?",
-                         (payout, 8 + len(opened)*2, chat_id, owner_id))
+            _wallet_adjust(conn, owner_id, payout)
+            conn.execute("UPDATE game_accounts SET xp=xp+?,wins=wins+1 WHERE chat_id=? AND user_id=?",
+                         (8 + len(opened)*2, chat_id, owner_id))
             row = conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?", (chat_id, owner_id)).fetchone()
         await query.edit_message_text(_hud_text(
             f"💰✨ CASH OUT SUCCESS! ✨💰\n💎 Safe: {len(opened)} | {multiplier:g}x"
@@ -692,8 +710,9 @@ async def cashout_mines(update: Update, context: ContextTypes.DEFAULT_TYPE):
     multiplier, payout = _mine_multiplier(len(opened)), int(int(game["bet"]) * _mine_multiplier(len(opened)))
     with db() as conn:
         conn.execute("DELETE FROM game_mines WHERE chat_id=? AND user_id=?", (chat_id, user.id))
-        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+?,wins=wins+1 WHERE chat_id=? AND user_id=?",
-                     (payout, 8 + len(opened)*2, chat_id, user.id))
+        _wallet_adjust(conn, user.id, payout)
+        conn.execute("UPDATE game_accounts SET xp=xp+?,wins=wins+1 WHERE chat_id=? AND user_id=?",
+                     (8 + len(opened)*2, chat_id, user.id))
         row = conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?", (chat_id, user.id)).fetchone()
     await update.effective_message.reply_text(_hud_text(
         f"💰 CASHOUT SUCCESS!\n💎 Safe: {len(opened)} | {multiplier:g}x"
@@ -778,9 +797,10 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         multiplier = multipliers[reward]
         payout = int(bet * multiplier)
         with db() as conn:
+            _wallet_adjust(conn, user.id, payout)
             conn.execute(
-                "UPDATE game_accounts SET coins=coins+?, xp=xp+3, wins=wins+1 WHERE chat_id=? AND user_id=?",
-                (payout, chat_id, user.id),
+                "UPDATE game_accounts SET xp=xp+3, wins=wins+1 WHERE chat_id=? AND user_id=?",
+                (chat_id, user.id),
             )
             row = conn.execute(
                 "SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",
@@ -873,7 +893,8 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     m=await update.effective_message.reply_text(_hud_text(f"🥊 NEXUS DUEL\n🔴 {row['challenger_name']} VS 🔵 {row['opponent_name']}\nFIGHT!"))
     await _animate_hud(m,["🥊 ROUND 1\n⚔️ FIGHT!","🥊 ROUND 2\n💥 CLASH!","🥊 FINAL ROUND\n🔥 FINISH MOVE!"],0.55)
     with db() as conn:
-        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+30,wins=wins+1 WHERE chat_id=? AND user_id=?",(payout,chat_id,winner))
+        _wallet_adjust(conn, winner, payout)
+        conn.execute("UPDATE game_accounts SET xp=xp+30,wins=wins+1 WHERE chat_id=? AND user_id=?",(chat_id,winner))
         conn.execute("UPDATE game_accounts SET xp=xp+10,losses=losses+1 WHERE chat_id=? AND user_id=?",(chat_id,loser))
         bal=conn.execute("SELECT coins FROM game_wallets WHERE user_id=?",(winner,)).fetchone()
     await m.edit_text(_hud_text(f"🥊 DUEL RESULT\n🏆 Winner: {winner_name}\n💰 +{payout:,} Coin\n⭐ Winner +30 XP / Loser +10 XP\n🪙 Winner Balance: {bal['coins']:,}"))
