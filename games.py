@@ -376,7 +376,7 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "╰─────────────────╯\n"
             f"⚡ SPINNING  {speed}"
         ))
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(1.1)
 
     if reward:
         icon = prize_icons[reward]
