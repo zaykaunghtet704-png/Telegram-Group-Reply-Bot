@@ -9,7 +9,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 from database import connect as db, DB_PATH, migrate_sqlite_once, export_database_json
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.error import TelegramError, RetryAfter, Forbidden
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
@@ -39,6 +39,7 @@ from games import (
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
+GAME_WEBAPP_URL = os.getenv("GAME_WEBAPP_URL", "https://pro-reply-3d-games.onrender.com").rstrip("/")
 BACKUP_INTERVAL_HOURS = max(1, int(os.getenv("BACKUP_INTERVAL_HOURS", "24")))
 
 logging.basicConfig(
@@ -267,6 +268,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user and update.effective_chat and update.effective_chat.type == "private":
         with db() as conn:
             conn.execute("INSERT OR IGNORE INTO known_users(user_id,first_seen) VALUES(?,?)", (user.id, time.time()))
+    if context.args and context.args[0].startswith("game_"):
+        try:
+            group_id = int(context.args[0][5:])
+        except ValueError:
+            group_id = 0
+        if group_id:
+            await update.effective_message.reply_text(
+                "🎮 NEXUS 3D GAME HUB\nGroup ထဲက သင့် Coin နဲ့ Level ကို အသုံးပြုပြီး ကစားနိုင်ပါပြီ။",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🚀 PLAY 3D GAME", web_app=WebAppInfo(url=f"{GAME_WEBAPP_URL}/?chat_id={group_id}"))
+                ]])
+            )
+            return
     await update.effective_message.reply_text(
         "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 𝗕𝗢𝗧 💎\n"
         "╭━━━━━━━━━━━━━━━━━━━━╮\n"
