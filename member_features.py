@@ -1,4 +1,5 @@
 """Persistent member utilities for PRO Reply Bot Ultimate X."""
+import re
 import time
 from database import connect
 
@@ -128,20 +129,48 @@ async def check_afk_mention(update, context):
     msg, chat = update.effective_message, update.effective_chat
     if not msg or not chat or chat.type not in ("group", "supergroup"):
         return
-    target = msg.reply_to_message.from_user if msg.reply_to_message else None
-    if not target or target.is_bot:
-        return
+
+    # Detect replied-to users, Telegram text mentions, and @username mentions.
+    candidates = {}
+    replied_user = msg.reply_to_message.from_user if msg.reply_to_message else None
+    if replied_user and not replied_user.is_bot:
+        candidates[replied_user.id] = replied_user.full_name
+
+    for entity in (msg.entities or []) + (msg.caption_entities or []):
+        mentioned_user = getattr(entity, "user", None)
+        if mentioned_user and not mentioned_user.is_bot:
+            candidates[mentioned_user.id] = mentioned_user.full_name
+
+    body = msg.text or msg.caption or ""
+    usernames = list(dict.fromkeys(re.findall(r"(?<![A-Za-z0-9_])@([A-Za-z0-9_]{5,32})", body)))[:5]
+
     with connect() as conn:
-        row = conn.execute(
-            "SELECT afk_text,afk_since FROM member_profiles WHERE chat_id=? AND user_id=?",
-            (chat.id, target.id),
-        ).fetchone()
-    if row and row["afk_text"]:
-        duration = max(0, int(time.time() - (row["afk_since"] or time.time())))
-        await msg.reply_text(
-            f"💤 {target.full_name} လက်ရှိ AFK ဖြစ်နေပါတယ်။\n"
-            f"အကြောင်းပြချက်: {row['afk_text']}\nကြာချိန်: {duration // 60} မိနစ်"
-        )
+        for username in usernames:
+            row = conn.execute(
+                "SELECT user_id,display_name FROM member_profiles "
+                "WHERE chat_id=? AND lower(username)=lower(?) LIMIT 1",
+                (chat.id, username),
+            ).fetchone()
+            if row:
+                candidates[row["user_id"]] = row["display_name"] or ("@" + username)
+
+        active = []
+        for target_id, display_name in candidates.items():
+            row = conn.execute(
+                "SELECT afk_text,afk_since FROM member_profiles "
+                "WHERE chat_id=? AND user_id=?",
+                (chat.id, target_id),
+            ).fetchone()
+            if row and row["afk_text"]:
+                duration = max(0, int(time.time() - (row["afk_since"] or time.time())))
+                active.append(
+                    f"💤 {display_name} လက်ရှိ AFK ဖြစ်နေပါတယ်။\n"
+                    f"အကြောင်းပြချက်: {row['afk_text']}\n"
+                    f"ကြာချိန်: {duration // 60} မိနစ်"
+                )
+
+    if active:
+        await msg.reply_text("\n\n".join(active[:5]))
 
 
 async def note_command(update, context):
