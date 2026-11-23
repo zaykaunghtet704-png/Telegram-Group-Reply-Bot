@@ -13,14 +13,31 @@ DAILY_COINS = 50
 QUIZ_REWARD = 25
 DUEL_REWARD = 40
 
-QUIZZES = [
-    ("မြန်မာနိုင်ငံ၏ မြို့တော်က ဘယ်မြို့လဲ?", ["ရန်ကုန်", "နေပြည်တော်", "မန္တလေး", "ပဲခူး"], 2),
-    ("တစ်ပတ်မှာ ရက်ဘယ်နှစ်ရက်ရှိလဲ?", ["၅", "၆", "၇", "၈"], 3),
-    ("ကမ္ဘာ့အကြီးဆုံး သမုဒ္ဒရာက ဘာလဲ?", ["အတ္တလန္တိတ်", "အိန္ဒိယ", "အာတိတ်", "ပစိဖိတ်"], 4),
-    ("ရေ၏ ဓာတုဖော်မြူလာက ဘာလဲ?", ["CO2", "H2O", "O2", "NaCl"], 2),
-    ("တစ်နာရီမှာ မိနစ်ဘယ်နှစ်မိနစ်ရှိလဲ?", ["၃၀", "၄၅", "၆၀", "၉၀"], 3),
-    ("နေကို ကမ္ဘာက ဘယ်လိုပတ်လဲ?", ["ပတ်လမ်းဖြင့်", "မပတ်ပါ", "တစ်ရက်တစ်ပတ်", "တစ်ပတ်တစ်ကြိမ်"], 1),
-]
+def _build_quiz_bank():
+    """Generate exactly 20,000 deterministic arithmetic questions."""
+    bank = []
+    rng = random.Random(20261123)
+    for n in range(1, 5001):
+        divisor = (n % 19) + 2
+        cases = [
+            (f"🧮 {n+137} + {n*3+29} = ?", n + 137 + n*3 + 29),
+            (f"🧮 {n*5+900} - {n+17} = ?", n*5 + 900 - n - 17),
+            (f"✖️ {n+11} × {(n % 17)+2} = ?", (n+11) * ((n % 17)+2)),
+            (f"➗ {(n+13)*divisor} ÷ {divisor} = ?", n+13),
+        ]
+        for question, correct in cases:
+            distractors = set()
+            while len(distractors) < 3:
+                candidate = max(0, correct + rng.choice([-19,-13,-7,-3,2,5,9,14,21]))
+                if candidate != correct:
+                    distractors.add(candidate)
+            options = [correct, *distractors]
+            rng.shuffle(options)
+            bank.append((question, [str(x) for x in options], options.index(correct)+1))
+    return bank
+
+
+QUIZZES = _build_quiz_bank()
 
 FISH = [
     ("ငါးသေး", 5, 12, 55),
