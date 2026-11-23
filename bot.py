@@ -32,7 +32,7 @@ from learning import (
     delete_learned, clear_pending,
 )
 from games import (
-    init_games, set_games_enabled, game_help, balance, daily, topcoins,
+    init_games, set_games_enabled, game_help, balance, rank, toprank, daily, topcoins,
     quiz, answer, fish, hunt, spin, duel, duel_accept, duel_decline,
     addcoins, takecoins,
 )
@@ -1441,7 +1441,9 @@ async def post_init(app):
         ("ads", "Manage private ad messages"),
         ("help", "Help and commands"),
         ("games", "Group games and coin commands"),
-        ("balance", "Show your game coins and level"),
+        ("balance", "Show your game coins, level and rank"),
+        ("rank", "Show player rank profile"),
+        ("toprank", "XP and rank leaderboard"),
         ("daily", "Claim daily game coins"),
         ("topcoins", "Group coin leaderboard"),
         ("quiz", "Start a group quiz"),
@@ -1564,6 +1566,8 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("games", game_help))
     app.add_handler(CommandHandler("balance", balance))
+    app.add_handler(CommandHandler("rank", rank))
+    app.add_handler(CommandHandler("toprank", toprank))
     app.add_handler(CommandHandler("daily", daily))
     app.add_handler(CommandHandler("topcoins", topcoins))
     app.add_handler(CommandHandler("quiz", quiz))
