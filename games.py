@@ -414,8 +414,10 @@ async def toprank(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     with db() as conn:
         rows = conn.execute(
-            "SELECT display_name,coins,xp,wins FROM game_accounts WHERE chat_id=? ORDER BY xp DESC,wins DESC LIMIT 10",
-            (update.effective_chat.id,),
+            "SELECT MAX(display_name) AS display_name,SUM(coins) AS coins,"
+            "SUM(xp) AS xp,SUM(wins) AS wins "
+            "FROM game_accounts GROUP BY user_id "
+            "ORDER BY SUM(xp) DESC,SUM(wins) DESC LIMIT 10"
         ).fetchall()
     if not rows:
         await update.effective_message.reply_text(_hud_text("🏆 Rank စာရင်း မရှိသေးပါ။"))
