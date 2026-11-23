@@ -55,10 +55,28 @@ async def global_access_guard(update, context):
     user = update.effective_user
     if not user or user.is_bot or (OWNER_ID and user.id == OWNER_ID):
         return
+
     maintenance, banned = get_user_restrictions(user.id)
-    if not maintenance and not banned:
+
+    # A Bot-level ban always blocks the user, including game commands.
+    if banned:
+        notice = "🚫 သင့်အကောင့်ကို Bot အသုံးပြုခွင့် ပိတ်ထားပါတယ်။"
+    elif maintenance:
+        # Keep the group coin/game system usable during general bot maintenance.
+        msg = update.effective_message
+        raw = (msg.text or "").strip() if msg else ""
+        command = raw.split(maxsplit=1)[0].split("@", 1)[0].lower() if raw.startswith("/") else ""
+        game_commands = {
+            "/games", "/balance", "/daily", "/topcoins", "/quiz", "/answer",
+            "/fish", "/hunt", "/spin", "/duel", "/duelaccept",
+            "/dueldecline", "/game",
+        }
+        if command in game_commands:
+            return
+        notice = "🛠 Bot ကို Maintenance လုပ်နေပါတယ်။ ခဏနေမှ ပြန်စမ်းပါ။"
+    else:
         return
-    notice = "🚫 သင့်အကောင့်ကို Bot အသုံးပြုခွင့် ပိတ်ထားပါတယ်။" if banned else "🛠 Bot ကို Maintenance လုပ်နေပါတယ်။ ခဏနေမှ ပြန်စမ်းပါ။"
+
     query = update.callback_query
     if query:
         await query.answer(notice, show_alert=True)
