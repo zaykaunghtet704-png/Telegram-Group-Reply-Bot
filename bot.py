@@ -40,6 +40,8 @@ from games import (
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
 GAME_WEBAPP_URL = os.getenv("GAME_WEBAPP_URL", "").strip().rstrip("/")
+if GAME_WEBAPP_URL and not GAME_WEBAPP_URL.startswith(("https://", "http://")):
+    GAME_WEBAPP_URL = "https://" + GAME_WEBAPP_URL
 BACKUP_INTERVAL_HOURS = max(1, int(os.getenv("BACKUP_INTERVAL_HOURS", "24")))
 
 logging.basicConfig(
