@@ -1,6 +1,8 @@
 """Persistent RPG progression, daily missions, achievements and cosmetic inventory."""
 import logging
-from datetime import date
+import random
+import time
+from datetime import date, timedelta
 
 from database import connect as db
 
@@ -51,6 +53,15 @@ def init_rpg():
             item_id TEXT NOT NULL,
             equipped_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY(user_id, slot)
+        )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS rpg_daily_claims (
+            user_id BIGINT PRIMARY KEY,
+            last_claim DATE NOT NULL,
+            streak BIGINT NOT NULL DEFAULT 1
+        )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS rpg_adventure_cooldowns (
+            user_id BIGINT PRIMARY KEY,
+            last_run DOUBLE PRECISION NOT NULL DEFAULT 0
         )""")
 
 
@@ -104,6 +115,17 @@ async def rpg_profile(update, context):
     coins = int(wallet["coins"]) if wallet else 0
     xp = int(stats["total_xp"])
     level = xp // 100 + 1
+    level_xp = xp % 100
+    rank_title = next(
+        (name for threshold, name in reversed([
+            (1, "Novice Adventurer"), (5, "Battle Fighter"),
+            (10, "Elite Warrior"), (20, "Dungeon Master"),
+            (30, "Dragon Slayer"), (50, "Mythic Hero"),
+            (75, "Divine Champion"), (100, "Immortal Legend"),
+        ]) if level >= threshold),
+        "Novice Adventurer",
+    )
+    progress_bar = "🟩" * (level_xp // 10) + "⬛" * (10 - level_xp // 10)
     win_rate = (int(stats["wins"]) * 100 / int(stats["games_played"])) if int(stats["games_played"]) else 0
     equipped = {row["slot"]: SHOP.get(row["item_id"], {}).get("name", "") for row in loadout}
     title = equipped.get("title") or "New Adventurer"
@@ -112,7 +134,8 @@ async def rpg_profile(update, context):
         "╭━━━ 💗 MYAE RPG PROFILE ━━━╮\n"
         f"👤 {user.full_name}\n🏷️ {title}\n🖼️ {frame}\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        f"⭐ RPG Level: {level}\n✨ Total XP: {xp:,}\n"
+        f"🏅 Class: {rank_title}\n⭐ RPG Level: {level}\n✨ Total XP: {xp:,}\n"
+        f"📊 Level Progress: [{progress_bar}] {level_xp}/100 XP\n"
         f"🎮 Games: {int(stats['games_played']):,}\n"
         f"🏆 Wins: {int(stats['wins']):,} | 💥 Losses: {int(stats['losses']):,}\n"
         f"📈 Win Rate: {win_rate:.1f}%\n🪙 Global Coins: {coins:,}\n"
@@ -286,3 +309,169 @@ async def equip_command(update, context):
             (user.id, item["slot"], item_id),
         )
     await update.effective_message.reply_text(f"✨ {item['name']} ကို Profile မှာ တပ်ဆင်ပြီးပါပြီ။ /rpg")
+
+
+async def rpg_daily_command(update, context):
+    """Claim a once-per-day RPG login reward with a persistent streak."""
+    user = update.effective_user
+    if not user:
+        return
+    today = date.today()
+    with db() as conn:
+        previous = conn.execute(
+            "SELECT last_claim,streak FROM rpg_daily_claims WHERE user_id=?",
+            (user.id,),
+        ).fetchone()
+        if previous and previous["last_claim"] == today:
+            await update.effective_message.reply_text(
+                "⏳ ဒီနေ့ RPG Daily Reward ကို ယူပြီးပါပြီ။ မနက်ဖြန် ပြန်လာခဲ့နော်။"
+            )
+            return
+        streak = (
+            int(previous["streak"]) + 1
+            if previous and previous["last_claim"] == today - timedelta(days=1)
+            else 1
+        )
+        coins = min(1000, 200 + (streak - 1) * 50)
+        xp = min(50, 20 + (streak - 1) * 5)
+        conn.execute(
+            """INSERT INTO rpg_daily_claims(user_id,last_claim,streak) VALUES(?,?,?)
+               ON CONFLICT(user_id) DO UPDATE SET
+               last_claim=EXCLUDED.last_claim,streak=EXCLUDED.streak""",
+            (user.id, today, streak),
+        )
+        conn.execute(
+            "INSERT INTO game_wallets(user_id,coins) VALUES(?,100) ON CONFLICT(user_id) DO NOTHING",
+            (user.id,),
+        )
+        wallet = conn.execute(
+            "UPDATE game_wallets SET coins=coins+? WHERE user_id=? RETURNING coins",
+            (coins, user.id),
+        ).fetchone()
+        conn.execute(
+            "UPDATE game_accounts SET coins=? WHERE user_id=?",
+            (int(wallet["coins"]), user.id),
+        )
+        conn.execute(
+            """INSERT INTO rpg_stats(user_id,total_xp) VALUES(?,?)
+               ON CONFLICT(user_id) DO UPDATE SET
+               total_xp=rpg_stats.total_xp+EXCLUDED.total_xp,
+               updated_at=CURRENT_TIMESTAMP""",
+            (user.id, xp),
+        )
+        _ensure_missions(conn, user.id)
+        conn.execute(
+            """UPDATE rpg_missions SET progress=LEAST(?,progress+?)
+               WHERE user_id=? AND mission_date=? AND mission_key='xp30'""",
+            (MISSIONS["xp30"]["goal"], xp, user.id, today),
+        )
+    await update.effective_message.reply_text(
+        "╭━━ 💗 MYAE RPG DAILY ━━╮\n"
+        f"🔥 Login Streak: {streak} day(s)\n"
+        f"🪙 Reward: +{coins:,} Coins\n"
+        f"✨ RPG XP: +{xp} XP\n"
+        f"💰 Wallet: {int(wallet['coins']):,} Coins\n"
+        "╰━━━━━━━━━━━━━━━━━━╯\n"
+        "မနက်ဖြန်လာရင် Streak ဆက်တိုးမယ်နော်။"
+    )
+
+
+async def adventure_command(update, context):
+    """Resolve a short solo RPG encounter, limited to one attempt per 30 minutes."""
+    user = update.effective_user
+    if not user:
+        return
+    now = time.time()
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO rpg_adventure_cooldowns(user_id,last_run) VALUES(?,0) ON CONFLICT(user_id) DO NOTHING",
+            (user.id,),
+        )
+        started = conn.execute(
+            """UPDATE rpg_adventure_cooldowns SET last_run=?
+               WHERE user_id=? AND last_run<=? RETURNING last_run""",
+            (now, user.id, now - 1800),
+        ).fetchone()
+        if not started:
+            row = conn.execute(
+                "SELECT last_run FROM rpg_adventure_cooldowns WHERE user_id=?",
+                (user.id,),
+            ).fetchone()
+            remaining = max(1, int(1800 - (now - float(row["last_run"]))))
+            minutes, seconds = divmod(remaining, 60)
+            await update.effective_message.reply_text(
+                f"⏳ နောက် Adventure အတွက် {minutes} မိနစ် {seconds} စက္ကန့် စောင့်ပါ။"
+            )
+            return
+        stats = conn.execute(
+            "SELECT total_xp FROM rpg_stats WHERE user_id=?", (user.id,)
+        ).fetchone()
+        level = (int(stats["total_xp"]) // 100 + 1) if stats else 1
+
+        monsters = [
+            ("🦇 Shadow Bat", 7), ("🐺 Dark Wolf", 10),
+            ("👹 Goblin King", 14), ("🐉 Baby Dragon", 19),
+            ("💀 Bone Knight", 16),
+        ]
+        monster, base_power = random.choice(monsters)
+        player_power = level * 2 + random.randint(1, 20)
+        enemy_power = base_power + level + random.randint(1, 12)
+        won = player_power >= enemy_power
+        xp = random.randint(25, 45) if won else random.randint(8, 15)
+        reward = min(2500, 200 + level * 15 + random.randint(50, 250)) if won else 0
+        if reward:
+            conn.execute(
+                "INSERT INTO game_wallets(user_id,coins) VALUES(?,100) ON CONFLICT(user_id) DO NOTHING",
+                (user.id,),
+            )
+            wallet = conn.execute(
+                "UPDATE game_wallets SET coins=coins+? WHERE user_id=? RETURNING coins",
+                (reward, user.id),
+            ).fetchone()
+            conn.execute(
+                "UPDATE game_accounts SET coins=? WHERE user_id=?",
+                (int(wallet["coins"]), user.id),
+            )
+        else:
+            wallet = conn.execute(
+                "SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)
+            ).fetchone()
+    record_game_event(user.id, won, xp)
+    balance = int(wallet["coins"]) if wallet else 0
+    result = "🏆 VICTORY!" if won else "💥 DEFEAT!"
+    reward_line = f"🪙 Coin Reward: +{reward:,}" if reward else "🪙 Coin Reward: +0"
+    await update.effective_message.reply_text(
+        "╭━━ ⚔️ MYAE DUNGEON ━━╮\n"
+        f"👤 Adventurer: {user.full_name}\n"
+        f"🧟 Enemy: {monster}\n"
+        f"⚔️ Your Power: {player_power}\n"
+        f"💀 Enemy Power: {enemy_power}\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"{result}\n✨ RPG XP: +{xp}\n{reward_line}\n"
+        f"💰 Wallet: {balance:,} Coins\n"
+        "╰━━━━━━━━━━━━━━━━━━╯\n"
+        "Adventure ပြန်ဝင်ရန် မိနစ် ၃၀ စောင့်ပါ။ /rpg"
+    )
+
+
+async def rpg_top_command(update, context):
+    with db() as conn:
+        rows = conn.execute(
+            """SELECT s.user_id,s.total_xp,
+                      COALESCE((SELECT g.display_name FROM game_accounts g
+                                WHERE g.user_id=s.user_id AND g.display_name<>''
+                                ORDER BY g.display_name LIMIT 1), 'Adventurer') AS display_name
+               FROM rpg_stats s ORDER BY s.total_xp DESC,s.user_id ASC LIMIT 10"""
+        ).fetchall()
+    if not rows:
+        await update.effective_message.reply_text("🌟 RPG Leaderboard မှာ ကစားသမား မရှိသေးပါ။")
+        return
+    lines = ["🏆 MYAE RPG TOP 10", "━━━━━━━━━━━━━━━━━━━━"]
+    for index, row in enumerate(rows, 1):
+        level = int(row["total_xp"]) // 100 + 1
+        lines.append(
+            f"{index}. {row['display_name']}\n"
+            f"   ⭐ Level {level} • ✨ {int(row['total_xp']):,} XP"
+        )
+    lines.append("━━━━━━━━━━━━━━━━━━━━\nကိုယ့် Profile: /rpg")
+    await update.effective_message.reply_text("\n".join(lines))
