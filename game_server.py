@@ -62,7 +62,8 @@ def _api_member(chat_id, user_id):
 def _session():
     user = _telegram_user(request.headers.get("X-Telegram-Init-Data", ""))
     try:
-        chat_id = int(request.args.get("chat_id") or request.json.get("chat_id"))
+        payload = request.get_json(silent=True) or {}
+        chat_id = int(request.args.get("chat_id") or payload.get("chat_id"))
     except (TypeError, ValueError, AttributeError):
         return None, None, (jsonify({"error": "Group session မတွေ့ပါ။ Bot မှ /games ကို ပြန်ဖွင့်ပါ။"}), 400)
     if not user:
@@ -216,6 +217,68 @@ def create_quiz():
         conn.execute("INSERT INTO owner_settings(setting_key,setting_value) VALUES(?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",
                      (key, json.dumps({"q": q["q"], "a": q["a"], "correct": q["correct"], "expires": time.time()+90}, ensure_ascii=False)))
     return jsonify({"question": {"q": q["q"], "a": q["a"]}, "account": _account(chat_id, user["id"])})
+
+
+@app.get("/api/players")
+def players():
+    user, chat_id, error = _session()
+    if error:
+        return error
+    with db() as conn:
+        rows = conn.execute("SELECT user_id,display_name,coins,xp FROM game_accounts WHERE chat_id=? AND user_id<>? ORDER BY xp DESC LIMIT 30", (chat_id, user["id"])).fetchall()
+    return jsonify({"players": [dict(r) for r in rows]})
+
+
+@app.get("/api/duel/pending")
+def duel_pending():
+    user, chat_id, error = _session()
+    if error:
+        return error
+    with db() as conn:
+        row = conn.execute("SELECT * FROM game_duels WHERE chat_id=?", (chat_id,)).fetchone()
+    if not row:
+        return jsonify({"pending": None})
+    return jsonify({"pending": dict(row), "is_opponent": int(row["opponent_id"]) == user["id"]})
+
+
+@app.post("/api/duel")
+def duel_challenge():
+    user, chat_id, error = _session()
+    if error:
+        return error
+    try:
+        target_id = int((request.get_json(silent=True) or {}).get("target_id"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "ပြိုင်ဘက်ကို ရွေးပါ။"}), 400
+    if target_id == user["id"] or not _api_member(chat_id, target_id):
+        return jsonify({"error": "ဒီ Member ကို Duel စိန်ခေါ်လို့မရပါ။"}), 400
+    with db() as conn:
+        target = conn.execute("SELECT display_name FROM game_accounts WHERE chat_id=? AND user_id=?", (chat_id, target_id)).fetchone()
+        if not target:
+            conn.execute("INSERT INTO game_accounts(chat_id,user_id,display_name,coins) VALUES(?,?,?,100)", (chat_id, target_id, "Player"))
+            target_name = "Player"
+        else:
+            target_name = target["display_name"]
+        conn.execute("INSERT INTO game_duels(chat_id,challenger_id,opponent_id,challenger_name,opponent_name,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(chat_id) DO UPDATE SET challenger_id=excluded.challenger_id,opponent_id=excluded.opponent_id,challenger_name=excluded.challenger_name,opponent_name=excluded.opponent_name,created_at=excluded.created_at", (chat_id, user["id"], target_id, user["name"], target_name, time.time()))
+    return jsonify({"message": f"{target_name} ကို Duel စိန်ခေါ်ပြီးပါပြီ။"})
+
+
+@app.post("/api/duel/accept")
+def duel_accept():
+    user, chat_id, error = _session()
+    if error:
+        return error
+    with db() as conn:
+        row = conn.execute("SELECT * FROM game_duels WHERE chat_id=?", (chat_id,)).fetchone()
+        if not row or int(row["opponent_id"]) != user["id"] or float(row["created_at"]) < time.time()-300:
+            return jsonify({"error": "လက်ခံနိုင်တဲ့ Duel မရှိပါ။"}), 400
+        conn.execute("DELETE FROM game_duels WHERE chat_id=?", (chat_id,))
+        winner_id = random.choice([int(row["challenger_id"]), int(row["opponent_id"])])
+        loser_id = int(row["opponent_id"]) if winner_id == int(row["challenger_id"]) else int(row["challenger_id"])
+        conn.execute("UPDATE game_accounts SET coins=coins+40,xp=xp+20,wins=wins+1 WHERE chat_id=? AND user_id=?", (chat_id, winner_id))
+        conn.execute("UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?", (chat_id, loser_id))
+    account = _account(chat_id, user["id"])
+    return jsonify({"winner_id": winner_id, "message": ("သင် အနိုင်ရပါတယ်!" if winner_id == user["id"] else "ပြိုင်ဘက်က အနိုင်ရသွားပါတယ်။"), "account": account, "level": _level(account["xp"])})
 
 
 if __name__ == "__main__":
