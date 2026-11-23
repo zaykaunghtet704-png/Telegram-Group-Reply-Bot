@@ -5,6 +5,7 @@ import time
 from datetime import date
 
 from database import connect as db
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 log = logging.getLogger("myaaye-rpg")
 
@@ -143,7 +144,18 @@ async def rpg_profile(update, context):
         f"📈 Win Rate: {win_rate:.1f}%\n🔥 Daily Streak: {daily_streak} day(s)\n"
         f"🪙 Global Coins: {coins:,}\n"
         "╰━━━━━━━━━━━━━━━━━━━━╯\n"
-        "Mission ကြည့်ရန် /missions • Items ကြည့်ရန် /inventory"
+        "\n💡 အောက်က Menu ခလုတ်တွေကို နှိပ်ပြီး RPG ကို လွယ်လွယ်ကူကူ သုံးနိုင်ပါတယ်။",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎁 Daily Reward", callback_data="rpg:daily"),
+             InlineKeyboardButton("⚔️ Adventure", callback_data="rpg:adventure")],
+            [InlineKeyboardButton("🎯 Missions", callback_data="rpg:missions"),
+             InlineKeyboardButton("🎒 Inventory", callback_data="rpg:inventory")],
+            [InlineKeyboardButton("🛒 Shop", callback_data="rpg:shop"),
+             InlineKeyboardButton("🏆 Leaderboard", callback_data="rpg:top")],
+            [InlineKeyboardButton("🐉 World Boss", callback_data="rpg:boss"),
+             InlineKeyboardButton("🛡 Guild", callback_data="rpg:guild")],
+            [InlineKeyboardButton("📖 ဘယ်လိုကစားမလဲ?", callback_data="rpg:help")],
+        ]),
     )
 
 
