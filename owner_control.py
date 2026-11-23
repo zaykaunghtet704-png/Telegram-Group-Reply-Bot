@@ -116,3 +116,63 @@ def maintenance_enabled():
     with connect() as conn:
         row = conn.execute("SELECT setting_value FROM owner_settings WHERE setting_key='maintenance'").fetchone()
     return bool(row and row["setting_value"] == "on")
+
+
+def get_user_restrictions(user_id):
+    """Read maintenance and bot-level ban state in one database connection."""
+    with connect() as conn:
+        maintenance = conn.execute(
+            "SELECT setting_value FROM owner_settings WHERE setting_key='maintenance'"
+        ).fetchone()
+        banned = conn.execute(
+            "SELECT active FROM owner_bans WHERE user_id=?", (user_id,)
+        ).fetchone()
+    return bool(maintenance and maintenance["setting_value"] == "on"), bool(banned and banned["active"])
+
+
+async def owner_ban_command(update, context, owner_id):
+    msg = update.effective_message
+    if not _owner(update, owner_id):
+        if msg:
+            await msg.reply_text("⛔ Bot Owner သာ အသုံးပြုနိုင်ပါတယ်။")
+        return
+    if not context.args or not context.args[0].isdigit():
+        await msg.reply_text("အသုံးပြုပုံ: /ownerban USER_ID အကြောင်းပြချက်")
+        return
+    target_id = int(context.args[0])
+    if target_id == owner_id:
+        await msg.reply_text("Bot Owner ကို ကိုယ်တိုင် Ban မလုပ်နိုင်ပါ။")
+        return
+    reason = " ".join(context.args[1:]).strip() or "Bot policy violation"
+    with connect() as conn:
+        conn.execute(
+            """INSERT INTO owner_bans(user_id,reason,created_at,active)
+               VALUES(?,?,?,1)
+               ON CONFLICT(user_id) DO UPDATE SET
+               reason=excluded.reason,created_at=excluded.created_at,active=1""",
+            (target_id, reason[:500], time.time()),
+        )
+    _log(owner_id, "user_ban", f"{target_id}: {reason}")
+    await msg.reply_text(f"🚫 User {target_id} ကို Bot အသုံးပြုခွင့် ပိတ်ပြီးပါပြီ။")
+
+
+async def owner_unban_command(update, context, owner_id):
+    msg = update.effective_message
+    if not _owner(update, owner_id):
+        if msg:
+            await msg.reply_text("⛔ Bot Owner သာ အသုံးပြုနိုင်ပါတယ်။")
+        return
+    if not context.args or not context.args[0].isdigit():
+        await msg.reply_text("အသုံးပြုပုံ: /ownerunban USER_ID")
+        return
+    target_id = int(context.args[0])
+    with connect() as conn:
+        cur = conn.execute(
+            "UPDATE owner_bans SET active=0 WHERE user_id=? AND active=1",
+            (target_id,),
+        )
+    if cur.rowcount:
+        _log(owner_id, "user_unban", str(target_id))
+        await msg.reply_text(f"✅ User {target_id} ကို Bot အသုံးပြုခွင့် ပြန်ဖွင့်ပြီးပါပြီ။")
+    else:
+        await msg.reply_text("ဒီ User ကို Ban မလုပ်ထားပါ။")
