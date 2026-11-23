@@ -862,7 +862,7 @@ async def bot_membership_update(update, context):
         try:
             await context.bot.send_message(
                 OWNER_ID,
-                f"⚠️ Bot ကို Group မှ ဖယ်ရှားလိုက်ပါပြီ။\\nGroup: {chat.title or 'Unknown'}\\nGroup ID: {chat.id}\\nလုပ်ဆောင်သူ: {actor.full_name} ({actor.id})",
+                f"⚠️ Bot ကို Group မှ ဖယ်ရှားလိုက်ပါပြီ။\nGroup: {chat.title or 'Unknown'}\nGroup ID: {chat.id}\nလုပ်ဆောင်သူ: {actor.full_name} ({actor.id})",
             )
         except TelegramError:
             logger.exception("Could not notify Bot Owner about bot removal")
@@ -871,7 +871,7 @@ async def bot_membership_update(update, context):
         try:
             await context.bot.send_message(
                 OWNER_ID,
-                f"⚠️ Bot ကို Group Admin အဖြစ်မှ ဖြုတ်လိုက်ပါပြီ။\\nGroup: {chat.title or 'Unknown'}\\nGroup ID: {chat.id}\\nလုပ်ဆောင်သူ: {actor.full_name} ({actor.id})",
+                f"⚠️ Bot ကို Group Admin အဖြစ်မှ ဖြုတ်လိုက်ပါပြီ။\nGroup: {chat.title or 'Unknown'}\nGroup ID: {chat.id}\nလုပ်ဆောင်သူ: {actor.full_name} ({actor.id})",
             )
         except TelegramError:
             logger.exception("Could not notify Bot Owner about bot demotion")
