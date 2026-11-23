@@ -277,16 +277,28 @@ async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     launch_url = f"https://t.me/{bot_username}?start=game_{chat_id}"
     await update.effective_message.reply_text(_hud_text(
-        "🎮 NEXUS GAME HUB • COIN ARENA\n━━━━━━━━━━━━━━━━━━\n"
-        "🪙 ဂိမ်းကစားရန် Coin လောင်းကြေးထည့်ပါ။ နိုင်ရင် payout + XP၊ ရှုံးရင် bet ဆုံးမယ်။\n\n"
-        "🧠 /quiz 100 — Quiz ဝင်ကစား\n/answer 1 — အဖြေဖြေ\n"
-        "🎣 /fish 100 — ငါးဖမ်း\n⚔️ /hunt 100 — Monster Hunt\n"
-        "🎰 /spin 100 — Slot Machine\n🥊 Member ကို Reply + /duel 100 — Duel\n\n"
-        "👤 /balance — Coin / Level / Rank\n🏅 /rank — ကိုယ့် Rank (Member ကို Reply လုပ်လည်းရ)\n"
-        "💣 /mines 100 — Minefield | /pick 1-25 | /cashout\n"
-        "🏆 /topcoins — Coin Top 10\n👑 /toprank — XP / Rank Top 10\n"
-        "🎁 /daily — နေ့စဉ် Coin Reward\n\n"
-        "📚 Quiz Bank: 20,000 Questions\n🧬 Level တစ်ဆင့်တက်ရန် 100 XP လိုအပ်သည်။"
+        "🎮 NEXUS GAME HUB • ELITE ARENA\n"
+        "╔════════════════════════════╗\n"
+        "   🪙 COIN • ⚡ XP • 👑 RANK\n"
+        "╚════════════════════════════╝\n"
+        "🎯 ကစားပုံ: Bet ထည့် → ကစား → ဆုကြေးယူ → Level တက်\n"
+        "⚡ Fish / Hunt / Spin / Mines မှာ Cooldown မရှိပါ။\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "💣 /mines 100 — Button နဲ့ 5×5 Minefield\n"
+        "🎰 /spin 100 — Lucky Slot Machine\n"
+        "🎣 /fish 100 — Fishing Treasure\n"
+        "⚔️ /hunt 100 — Monster Battle\n"
+        "🧠 /quiz 100 — Quiz Arena | /answer 1-4\n"
+        "🥊 Member ကို Reply + /duel 100 — PvP Duel\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "👛 /balance — Coin • XP • Level • Rank\n"
+        "🏅 /rank — Player Profile\n"
+        "🥇 /topcoins — Coin Champions Top 10\n"
+        "👑 /toprank — XP / Rank Hall of Fame\n"
+        "🎁 /daily — Daily Coin + XP Reward\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📚 Quiz Bank: 20,000 Questions\n"
+        "🧬 100 XP = Level တစ်ဆင့် | 🏆 အနိုင်ရတိုင်း XP ရမယ်။"
     ), reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎮 Open 3D Web Game", url=launch_url)]]))
 
 async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -542,7 +554,7 @@ async def mine_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not 1 <= cell <= 25:
             return
         if cell in opened:
-            await query.answer("ဒီအကွက်ကို ဖွင့်ပြီးသားပါ။", show_alert=True)
+            await query.edit_message_reply_markup(reply_markup=_mine_keyboard(owner_id, opened))
             return
         if cell in mines_set:
             with db() as conn:
