@@ -88,6 +88,17 @@ def init_games():
             opponent_name TEXT NOT NULL,
             created_at DOUBLE PRECISION NOT NULL
         )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS game_quiz_players (
+            chat_id BIGINT NOT NULL,
+            user_id BIGINT NOT NULL,
+            bet BIGINT NOT NULL,
+            joined_at DOUBLE PRECISION NOT NULL,
+            PRIMARY KEY(chat_id, user_id)
+        )""")
+        try:
+            conn.execute("ALTER TABLE game_duels ADD COLUMN IF NOT EXISTS wager BIGINT NOT NULL DEFAULT 0")
+        except Exception:
+            pass
 
 
 def set_games_enabled(chat_id, enabled):
@@ -163,6 +174,58 @@ def _level(xp):
     return 1 + int(max(0, xp) // 100)
 
 
+
+def _rank(xp):
+    level = _level(xp)
+    tiers = [
+        (1, "🥉 Bronze"), (5, "🥈 Silver"), (10, "🥇 Gold"),
+        (20, "💠 Platinum"), (30, "💎 Diamond"),
+        (50, "👑 Master"), (75, "🔥 Grandmaster"), (100, "🌌 Mythic"),
+    ]
+    current = tiers[0]
+    following = None
+    for i, tier in enumerate(tiers):
+        if level >= tier[0]:
+            current = tier
+            following = tiers[i + 1] if i + 1 < len(tiers) else None
+    return current[1], level, following
+
+
+def _valid_bet(context, minimum=10, maximum=1_000_000_000):
+    if not context.args or not context.args[0].isdigit():
+        return None
+    amount = int(context.args[0])
+    return amount if minimum <= amount <= maximum else None
+
+
+def _stake(chat_id, user, amount):
+    _account(chat_id, user)
+    with db() as conn:
+        result = conn.execute(
+            "UPDATE game_accounts SET coins=coins-? WHERE chat_id=? AND user_id=? AND coins>=?",
+            (amount, chat_id, user.id, amount),
+        )
+        if result.rowcount != 1:
+            return None
+        return conn.execute(
+            "SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",
+            (chat_id, user.id),
+        ).fetchone()
+
+
+def _expire_quiz(chat_id):
+    with db() as conn:
+        players = conn.execute(
+            "SELECT user_id FROM game_quiz_players WHERE chat_id=?", (chat_id,)
+        ).fetchall()
+        for player in players:
+            conn.execute(
+                "UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?",
+                (chat_id, int(player["user_id"])),
+            )
+        conn.execute("DELETE FROM game_quiz_players WHERE chat_id=?", (chat_id,))
+        conn.execute("DELETE FROM game_quizzes WHERE chat_id=?", (chat_id,))
+
 def _group(update):
     chat = update.effective_chat
     return bool(chat and chat.type in ("group", "supergroup"))
@@ -220,12 +283,44 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
         return
     row = _account(update.effective_chat.id, update.effective_user)
+    title, level, following = _rank(row["xp"])
     await update.effective_message.reply_text(_hud_text(
         f"👤 {row['display_name']}\n🪙 Coin: {row['coins']:,}\n"
-        f"⭐ Level: {_level(row['xp'])} | XP: {row['xp']:,}\n"
+        f"🏅 Rank: {title}\n⭐ Level: {level} | XP: {row['xp']:,}\n"
         f"🏆 အနိုင်: {row['wins']} | ရှုံး: {row['losses']}"
     ))
 
+async def rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _ready(update):
+        return
+    target = update.effective_message.reply_to_message.from_user if update.effective_message.reply_to_message else update.effective_user
+    row = _account(update.effective_chat.id, target)
+    title, level, following = _rank(row["xp"])
+    progress = int(row["xp"]) % 100
+    next_line = f"➡️ နောက် Rank: {following[1]} (Lv.{following[0]})" if following else "🌌 အမြင့်ဆုံး Rank ရောက်ရှိပါပြီ!"
+    await update.effective_message.reply_text(_hud_text(
+        f"🏅 PLAYER RANK PROFILE\n━━━━━━━━━━━━━━━━━━\n👤 {row['display_name']}\n"
+        f"🏆 Rank: {title}\n⭐ Level: {level}\n✨ XP: {row['xp']:,} ({progress}/100)\n"
+        f"{next_line}\n🪙 Coin: {row['coins']:,}\n⚔️ Wins: {row['wins']} | Losses: {row['losses']}"
+    ))
+
+
+async def toprank(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _ready(update):
+        return
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT display_name,coins,xp,wins FROM game_accounts WHERE chat_id=? ORDER BY xp DESC,wins DESC LIMIT 10",
+            (update.effective_chat.id,),
+        ).fetchall()
+    if not rows:
+        await update.effective_message.reply_text(_hud_text("🏆 Rank စာရင်း မရှိသေးပါ။"))
+        return
+    lines = ["🏆 NEXUS RANK LEADERBOARD • TOP 10"]
+    for i, row in enumerate(rows, 1):
+        title, level, _ = _rank(row["xp"])
+        lines.append(f"{i}. {title} • {row['display_name']} — Lv.{level} | {row['xp']:,} XP")
+    await update.effective_message.reply_text(_hud_text("\n".join(lines)))
 
 async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
