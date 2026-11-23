@@ -380,6 +380,12 @@ async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👑 /toprank — XP / Rank Hall of Fame\n"
         "🎁 /daily — Daily Coin + XP Reward\n"
         "━━━━━━━━━━━━━━━━━━\n"
+        "🧬 /rpg — RPG Player Profile\n"
+        "🎯 /missions — Daily Missions | /missionclaim play3/win2/xp30\n"
+        "🎖️ /achievements — Achievement Collection\n"
+        "🛒 /shop — Cosmetic Shop | /buy ITEM_ID\n"
+        "🎒 /inventory — Items | /equip ITEM_ID\n"
+        "━━━━━━━━━━━━━━━━━━\n"
         "📚 Quiz Bank: 20,000 Questions\n"
         "🧬 100 XP = Level တစ်ဆင့် | 🏆 အနိုင်ရတိုင်း XP ရမယ်။"
     ), reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎮 Open 3D Web Game", url=launch_url)]]))
@@ -531,6 +537,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         _wallet_adjust(conn, user.id, payout)
         conn.execute("UPDATE game_accounts SET xp=xp+25,wins=wins+1 WHERE chat_id=? AND user_id=?",(chat_id,user.id))
         row=conn.execute("SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
+    for player_row in players:
+        if int(player_row["user_id"]) != user.id:
+            record_game_event(int(player_row["user_id"]), False, 0)
     record_game_event(user.id, True, 25)
     m=await update.effective_message.reply_text(_hud_text("🧠 QUIZ RESULT\n🏆 Winner detected..."))
     await _animate_hud(m,["🔓 REWARD UNLOCKED!","🎉 CORRECT ANSWER!"],0.35)
