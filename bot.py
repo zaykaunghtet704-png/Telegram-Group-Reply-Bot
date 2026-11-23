@@ -1249,9 +1249,6 @@ async def code_create_command(update, context):
     if not user or user.id != OWNER_ID:
         await msg.reply_text("⛔ Coin Code ဖန်တီးခွင့်ကို Bot Owner သာ ရရှိပါတယ်။")
         return
-    if update.effective_chat.type != "private":
-        await msg.reply_text("🔐 Code လုံခြုံရေးအတွက် Bot Private Chat မှာ ဒီ Command ကို သုံးပါ။")
-        return
     if not context.args or not context.args[0].isdigit():
         await msg.reply_text(
             "💎 MYAE COIN CODE STUDIO\n"
