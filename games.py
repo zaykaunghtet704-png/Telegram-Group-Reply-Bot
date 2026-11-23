@@ -601,9 +601,6 @@ async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await m.edit_text(_hud_text(f"⚔️ HUNT RESULT • {'🏆 VICTORY' if won else '💥 DEFEAT'}\n👹 {monster}\n{'💰 Payout: '+format(payout,',')+' Coin (2x)' if won else '📉 Bet lost: '+format(bet,',')+' Coin'}\n⭐ XP +{20 if won else 5}\n🪙 Balance: {row['coins']:,}"))
 
 
-MINES_MULTIPLIERS = [1.08, 1.23, 1.42, 1.64, 1.92, 2.26, 2.68, 3.21, 3.90, 4.80]
-
-
 MINES_MULTIPLIERS = [1.08, 1.23, 1.42, 1.64, 1.92, 2.25, 2.68, 3.21, 3.90, 4.80]
 
 
