@@ -178,3 +178,16 @@ Group admins can customize both messages independently. Settings are stored in P
 - `/resetwelcome` and `/resetgoodbye` — restore the built-in default text.
 
 Placeholders: `{name}` (member name), `{username}` (Telegram username), `{id}` (Telegram user ID), `{chat}` (group title), and `{count}` (current member count). Messages are plain text and can contain emoji and line breaks. Maximum custom message length: 3,500 characters.
+
+
+## MYAE RPG Expansion
+
+- `/rpg` — persistent RPG profile with total RPG XP, level, win rate, global coins and equipped cosmetics.
+- `/missions` — daily missions: play 3 games, win 2 games, and earn 30 RPG XP.
+- `/missionclaim play3|win2|xp30` — claim each completed daily reward once.
+- `/achievements` — view unlocked game milestones.
+- `/shop`, `/buy ITEM_ID` — buy cosmetic profile frames and titles with the shared global Coin wallet.
+- `/inventory`, `/equip ITEM_ID` — view and equip owned cosmetic items.
+- RPG statistics, mission progress, inventory and loadout are stored in PostgreSQL and included in database backups.
+- RPG XP is a separate lifetime progression track and starts accumulating when the RPG update is deployed; existing game XP and ranks remain unchanged.
+- Current cosmetic shop items are visual profile decorations only; they do not change game odds or payouts.
