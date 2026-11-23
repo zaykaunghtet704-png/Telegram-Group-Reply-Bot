@@ -113,7 +113,7 @@ async def dungeon_command(update, context):
         coins = _wallet(conn, user.id)
         entry = 1500
         if coins < entry:
-            await update.effective_message.reply_text(f"🪙 Dungeon ဝင်ကြေး {entry:,} Coin လိုပါတယ်။ လက်ကျန် {coins:,} Coin")
+            await update.effective_message.reply_text(f"💰 Dungeon ဝင်ကြေး {entry:,} Coin လိုပါတယ်။ လက်ကျန် {coins:,} Coin")
             return
         conn.execute("UPDATE game_wallets SET coins=coins-? WHERE user_id=? AND coins>=?", (entry,user.id,entry))
         _sync_legacy(conn, user.id, coins-entry)
@@ -145,7 +145,7 @@ async def summon_command(update, context):
         coins = _wallet(conn, user.id)
         if coins < SUMMON_COST:
             await update.effective_message.reply_text(
-                f"╭━━ ✨ HERO SUMMON ━━╮\n🪙 လိုအပ်သော Coin: {SUMMON_COST:,}\n💰 လက်ကျန်: {coins:,}\n╰━━━━━━━━━━━━━━╯"
+                f"╭━━ ✨ HERO SUMMON ━━╮\n💰 လိုအပ်သော Coin: {SUMMON_COST:,}\n💰 လက်ကျန်: {coins:,}\n╰━━━━━━━━━━━━━━╯"
             )
             return
         conn.execute("UPDATE game_wallets SET coins=coins-? WHERE user_id=? AND coins>=?", (SUMMON_COST,user.id,SUMMON_COST))
@@ -172,7 +172,7 @@ async def summon_command(update, context):
         f"{hero_name}\n"
         f"💠 RARITY: {_rarity_badge(rarity)}\n"
         f"⚔️ HERO POWER: +{power}\n"
-        f"🪙 Cost: {SUMMON_COST:,} Coin\n"
+        f"💰 Cost: {SUMMON_COST:,} Coin\n"
         f"💰 Balance: {balance:,} Coin\n"
         "╰━━━━━━━━━━━━━━╯",
         reply_markup=InlineKeyboardMarkup([[
@@ -307,7 +307,7 @@ async def rpg_ultimate_callback(update, context):
             _add_progress(conn,user.id,8,prize>700)
         result = "🪤 ထောင်ချောက်မိသွားတယ်။" if prize == 0 else f"💎 ရတနာတွေ့ပြီ! +{prize:,} Coin"
         await query.edit_message_text(
-            f"🗺️ TREASURE RESULT\n📦 Chest {chest.upper()}\n{result}\n🪙 Balance: {balance:,} Coin\n✨ +8 RPG XP",
+            f"🗺️ TREASURE RESULT\n📦 Chest {chest.upper()}\n{result}\n💰 Balance: {balance:,} Coin\n✨ +8 RPG XP",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔁 ထပ်ရှာမယ်", callback_data="rpgx:treasure"),
                 InlineKeyboardButton("🏠 RPG Menu", callback_data="rpg:profile"),
@@ -357,7 +357,7 @@ async def rpg_ultimate_callback(update, context):
                 )
                 result = (
                     "🏆 DUNGEON CLEARED!\n"
-                    f"💥 Final Damage: {attack}\n🪙 Reward: +{reward:,} Coin\n"
+                    f"💥 Final Damage: {attack}\n💰 Reward: +{reward:,} Coin\n"
                     f"✨ RPG XP: +35\n💰 Balance: {balance:,} Coin"
                 )
                 keyboard = InlineKeyboardMarkup([[
