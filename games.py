@@ -345,12 +345,7 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
         return
     chat_id, user = update.effective_chat.id, update.effective_user
-    wait = _cooldown(chat_id, user.id, "spin", 43200)
-    if wait:
-        hours, mins = divmod(wait // 60, 60)
-        await update.effective_message.reply_text(_hud_text(f"🎰 Spin ပြန်လှည့်ရန် {hours} နာရီ {mins} မိနစ် စောင့်ပါ။"))
-        return
-
+    # No daily cooldown: members can spin again whenever they want.
     # Keep the existing reward odds and reveal the result with animated slot reels.
     reward = random.choices([0, 10, 25, 50, 100, 200], weights=[20, 25, 25, 18, 10, 2], k=1)[0]
     prize_icons = {10: "🍒", 25: "🍋", 50: "🍉", 100: "🍇", 200: "💎"}
