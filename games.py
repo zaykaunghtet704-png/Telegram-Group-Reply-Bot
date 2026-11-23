@@ -161,21 +161,20 @@ def _cooldown(chat_id, user_id, action, seconds):
 async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
         return
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    bot_username = context.bot.username
+    chat_id = update.effective_chat.id
+    launch_url = f"https://t.me/{bot_username}?start=game_{chat_id}"
     await update.effective_message.reply_text(
-        "🎮 GROUP GAME CENTER\n"
+        "🎮 NEXUS 3D GAME HUB\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "/balance — Coin လက်ကျန်\n"
-        "/daily — နေ့စဉ် Coin 50 ယူရန်\n"
-        "/topcoins — Coin အများဆုံး Top 10\n"
-        "/quiz — Quiz မေးခွန်းစရန်\n"
-        "/answer 1-4 — Quiz ဖြေရန်\n"
-        "/fish — ငါးဖမ်းရန်\n"
-        "/hunt — Monster တိုက်ရန်\n"
-        "/spin — Lucky Spin (12 နာရီတစ်ကြိမ်)\n"
-        "/duel — Reply လုပ်ထားသူကို Duel စိန်ခေါ်ရန်\n"
-        "/duelaccept — Duel လက်ခံရန်\n"
-        "/dueldecline — Duel ငြင်းရန်\n\n"
-        "🪙 စတင် Coin 100 | Level တက်ရန် XP 100 လိုပါတယ်။"
+        "3D World ထဲမှာ Character ကို Joystick နဲ့ လှုပ်ရှားပြီး ကစားနိုင်ပါပြီ။\n\n"
+        "🎣 Fishing · ⚔️ Monster Hunt\n"
+        "🧠 Quiz Battle · 🎰 Lucky Spin\n"
+        "🥊 1v1 Duel (Arena အဆင့်ဆင့် ဖွံ့ဖြိုးနေဆဲ)\n\n"
+        "🪙 Group Coin / Level / XP ကို လက်ရှိ Bot Database နဲ့ ချိတ်ဆက်ထားပါတယ်။\n"
+        "အောက်ကခလုတ်ကိုနှိပ်ပြီး Bot Private Chat ထဲမှာ Game ကိုဖွင့်ပါ။",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎮 Open 3D Game", url=launch_url)]])
     )
 
 
