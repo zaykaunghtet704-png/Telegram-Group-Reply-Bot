@@ -27,6 +27,7 @@ MIGRATION_TABLES = (
     "game_groups", "game_accounts", "game_cooldowns", "game_quizzes", "game_duels",
     "coin_codes", "coin_code_redemptions",
     "rpg_stats", "rpg_missions", "rpg_inventory", "rpg_loadout",
+    "rpg_daily_claims", "rpg_adventure_cooldowns",
 )
 
 
