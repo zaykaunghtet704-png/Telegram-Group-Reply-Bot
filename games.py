@@ -111,7 +111,7 @@ def _change(chat_id, user, coins=0, xp=0, wins=0, losses=0):
     _account(chat_id, user)
     with db() as conn:
         conn.execute(
-            "UPDATE game_accounts SET coins=MAX(0,coins+?), xp=xp+?, wins=wins+?, losses=losses+? "
+            "UPDATE game_accounts SET coins=GREATEST(0,coins+?), xp=xp+?, wins=wins+?, losses=losses+? "
             "WHERE chat_id=? AND user_id=?",
             (int(coins), int(xp), int(wins), int(losses), chat_id, user.id),
         )
@@ -277,8 +277,7 @@ async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if wait:
         await update.effective_message.reply_text(f"🎣 နောက်တစ်ကြိမ် ငါးဖမ်းရန် {wait} စက္ကန့် စောင့်ပါ။")
         return
-    roll = random.randint(1, 100)
-    chosen = next((x for x in FISH if roll <= x[3]), None)
+    chosen = random.choices(FISH, weights=[x[3] for x in FISH], k=1)[0]
     if chosen:
         name, low, high, _ = chosen
         reward = random.randint(low, high)
