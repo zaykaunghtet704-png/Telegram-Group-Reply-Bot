@@ -118,8 +118,8 @@ Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, `O
 - Each Telegram user has one shared coin wallet across all groups.
 - Spending or winning coins in one group immediately changes the same balance in every other group.
 - Daily coin claims and their 24-hour cooldown are shared across groups.
-- `/topcoins` shows the global coin leaderboard, not a per-group list.
-- Existing group balances are migrated by keeping each user's highest previous balance, avoiding accidental multiplication of duplicate starter balances. Group-specific XP/rank progress remains separate.
+- `/topcoins` shows the global coin leaderboard, not a per-group list; `/toprank` aggregates XP across the user's group records.
+- Existing group balances are migrated by keeping each user's highest previous balance, avoiding accidental multiplication of duplicate starter balances. The `/rank` profile continues to show the current group's XP progress.
 
 ## Ultimate X member tools (added)
 
