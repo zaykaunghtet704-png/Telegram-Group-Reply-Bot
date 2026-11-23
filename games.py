@@ -345,10 +345,44 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
         return
     chat_id, user = update.effective_chat.id, update.effective_user
-    # No daily cooldown: members can spin again whenever they want.
-    # Keep the existing reward odds and reveal the result with animated slot reels.
+
+    if not context.args or not context.args[0].isdigit():
+        await update.effective_message.reply_text(_hud_text(
+            "🎰 Slot ကစားရန် လောင်းကြေးထည့်ပါ။\n"
+            "အသုံးပြုပုံ: /spin 100\n"
+            "အနည်းဆုံး 10 Coin လောင်းနိုင်ပါတယ်။\n"
+            "❌ ရှုံးရင် လောင်းကြေးဆုံးရှုံးမယ်။\n"
+            "🏆 နိုင်ရင် 1.2x မှ 5x အထိ ပြန်ရနိုင်ပါတယ်။"
+        ))
+        return
+
+    bet = int(context.args[0])
+    if bet < 10 or bet > 1_000_000_000:
+        await update.effective_message.reply_text(_hud_text("❌ လောင်းကြေးသည် 10 Coin မှ 1,000,000,000 Coin အတွင်း ဖြစ်ရပါမယ်။"))
+        return
+
+    # Atomically reserve the stake so simultaneous spins cannot spend the same coins.
+    _account(chat_id, user)
+    with db() as conn:
+        debit = conn.execute(
+            "UPDATE game_accounts SET coins=coins-? WHERE chat_id=? AND user_id=? AND coins>=?",
+            (bet, chat_id, user.id, bet),
+        )
+        if debit.rowcount != 1:
+            row = conn.execute(
+                "SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",
+                (chat_id, user.id),
+            ).fetchone()
+            balance_now = int(row["coins"]) if row else 0
+            await update.effective_message.reply_text(_hud_text(
+                f"🪙 Coin မလုံလောက်ပါ။\nလက်ကျန်: {balance_now:,} Coin\nလောင်းကြေး: {bet:,} Coin"
+            ))
+            return
+
+    # Existing slot odds are preserved. A winning symbol determines the payout multiplier.
     reward = random.choices([0, 10, 25, 50, 100, 200], weights=[20, 25, 25, 18, 10, 2], k=1)[0]
     prize_icons = {10: "🍒", 25: "🍋", 50: "🍉", 100: "🍇", 200: "💎"}
+    multipliers = {10: 1.2, 25: 1.5, 50: 2.0, 100: 3.0, 200: 5.0}
     symbols = ["🍒", "🍋", "🍉", "🍇", "🍊", "⭐", "💎"]
     message = await update.effective_message.reply_text(_hud_text(
         "🎰 NEXUS SLOT MACHINE\n"
@@ -356,10 +390,10 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "╭─────── 🎰 ───────╮\n"
         "│   ❔  │  ❔  │  ❔   │\n"
         "╰─────────────────╯\n"
+        f"🪙 လောင်းကြေး: {bet:,} Coin\n"
         "⚡ REELS STARTING..."
     ))
 
-    # Telegram displays each edit as the fruit reels roll in the group chat.
     for frame in range(6):
         reels = [random.choice(symbols) for _ in range(3)]
         speed = "▰" * (6 - frame) + "▱" * frame
@@ -369,6 +403,7 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"╭─────── 🎰 ───────╮\n"
             f"│   {reels[0]}  │  {reels[1]}  │  {reels[2]}   │\n"
             "╰─────────────────╯\n"
+            f"🪙 BET: {bet:,} COIN\n"
             f"⚡ SPINNING  {speed}"
         ))
         await asyncio.sleep(1.1)
@@ -376,16 +411,41 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if reward:
         icon = prize_icons[reward]
         final_reels = [icon, icon, icon]
+        multiplier = multipliers[reward]
+        payout = int(bet * multiplier)
+        with db() as conn:
+            conn.execute(
+                "UPDATE game_accounts SET coins=coins+?, xp=xp+3, wins=wins+1 WHERE chat_id=? AND user_id=?",
+                (payout, chat_id, user.id),
+            )
+            row = conn.execute(
+                "SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",
+                (chat_id, user.id),
+            ).fetchone()
+        net = payout - bet
+        result = (
+            f"🎉 WIN! {multiplier:g}x PAYOUT\n"
+            f"💰 ပြန်ရငွေ: +{payout:,} Coin\n"
+            f"📈 အသားတင်အမြတ်: +{net:,} Coin\n"
+            f"🪙 လက်ကျန်: {row['coins']:,} Coin\n⭐ +3 XP"
+        )
     else:
         final_reels = random.sample(symbols[:-1], 3)
         if len(set(final_reels)) == 1:
             final_reels[2] = "⭐"
-
-    if reward:
-        row = _change(chat_id, user, coins=reward, xp=3)
-        result = f"🎉 JACKPOT! +{reward} COIN\n🪙 လက်ကျန်: {row['coins']:,}\n⭐ +3 XP"
-    else:
-        result = "😅 ဒီတစ်ကြိမ် ဆုမပေါက်ပါဘူး။ နောက်တစ်ကြိမ် ကံစမ်းပါ။"
+        with db() as conn:
+            conn.execute(
+                "UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?",
+                (chat_id, user.id),
+            )
+            row = conn.execute(
+                "SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",
+                (chat_id, user.id),
+            ).fetchone()
+        result = (
+            f"💥 LOSE! -{bet:,} Coin\n"
+            f"🪙 လက်ကျန်: {row['coins']:,} Coin"
+        )
 
     await message.edit_text(_hud_text(
         "🎰 NEXUS SLOT MACHINE • RESULT\n"
@@ -393,9 +453,9 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"╭─────── 🎰 ───────╮\n"
         f"│   {final_reels[0]}  │  {final_reels[1]}  │  {final_reels[2]}   │\n"
         "╰─────────────────╯\n"
+        f"🎯 လောင်းကြေး: {bet:,} Coin\n"
         f"{result}"
     ))
-
 
 async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
