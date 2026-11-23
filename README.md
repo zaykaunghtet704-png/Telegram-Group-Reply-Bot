@@ -113,6 +113,14 @@ Install dependencies with `pip install -r requirements.txt`, set `BOT_TOKEN`, `O
 - Send ads responsibly and only to users who have started the bot and have not opted out.
 
 
+## Global Game Coin Wallet
+
+- Each Telegram user has one shared coin wallet across all groups.
+- Spending or winning coins in one group immediately changes the same balance in every other group.
+- Daily coin claims and their 24-hour cooldown are shared across groups.
+- `/topcoins` shows the global coin leaderboard, not a per-group list.
+- Existing group balances are migrated by keeping each user's highest previous balance, avoiding accidental multiplication of duplicate starter balances. Group-specific XP/rank progress remains separate.
+
 ## Ultimate X member tools (added)
 
 - `/id` — show your Telegram user ID and current chat ID; reply to a member's message to inspect their ID.
