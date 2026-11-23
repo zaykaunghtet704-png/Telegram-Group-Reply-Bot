@@ -356,11 +356,11 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     prize_icons = {10: "🍒", 25: "🍋", 50: "🍉", 100: "🍇", 200: "💎"}
     symbols = ["🍒", "🍋", "🍉", "🍇", "🍊", "⭐", "💎"]
     message = await update.effective_message.reply_text(_hud_text(
-        "🎰 NEXUS SLOT MACHINE\\n"
-        "━━━━━━━━━━━━━━━━━━\\n"
-        "╭─────── 🎰 ───────╮\\n"
-        "│   ❔  │  ❔  │  ❔   │\\n"
-        "╰─────────────────╯\\n"
+        "🎰 NEXUS SLOT MACHINE\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "╭─────── 🎰 ───────╮\n"
+        "│   ❔  │  ❔  │  ❔   │\n"
+        "╰─────────────────╯\n"
         "⚡ REELS STARTING..."
     ))
 
@@ -369,11 +369,11 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reels = [random.choice(symbols) for _ in range(3)]
         speed = "▰" * (6 - frame) + "▱" * frame
         await message.edit_text(_hud_text(
-            "🎰 NEXUS SLOT MACHINE\\n"
-            "━━━━━━━━━━━━━━━━━━\\n"
-            f"╭─────── 🎰 ───────╮\\n"
-            f"│   {reels[0]}  │  {reels[1]}  │  {reels[2]}   │\\n"
-            "╰─────────────────╯\\n"
+            "🎰 NEXUS SLOT MACHINE\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"╭─────── 🎰 ───────╮\n"
+            f"│   {reels[0]}  │  {reels[1]}  │  {reels[2]}   │\n"
+            "╰─────────────────╯\n"
             f"⚡ SPINNING  {speed}"
         ))
         await asyncio.sleep(0.8)
@@ -388,16 +388,16 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if reward:
         row = _change(chat_id, user, coins=reward, xp=3)
-        result = f"🎉 JACKPOT! +{reward} COIN\\n🪙 လက်ကျန်: {row['coins']:,}\\n⭐ +3 XP"
+        result = f"🎉 JACKPOT! +{reward} COIN\n🪙 လက်ကျန်: {row['coins']:,}\n⭐ +3 XP"
     else:
         result = "😅 ဒီတစ်ကြိမ် ဆုမပေါက်ပါဘူး။ နောက်တစ်ကြိမ် ကံစမ်းပါ။"
 
     await message.edit_text(_hud_text(
-        "🎰 NEXUS SLOT MACHINE • RESULT\\n"
-        "━━━━━━━━━━━━━━━━━━\\n"
-        f"╭─────── 🎰 ───────╮\\n"
-        f"│   {final_reels[0]}  │  {final_reels[1]}  │  {final_reels[2]}   │\\n"
-        "╰─────────────────╯\\n"
+        "🎰 NEXUS SLOT MACHINE • RESULT\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"╭─────── 🎰 ───────╮\n"
+        f"│   {final_reels[0]}  │  {final_reels[1]}  │  {final_reels[2]}   │\n"
+        "╰─────────────────╯\n"
         f"{result}"
     ))
 
