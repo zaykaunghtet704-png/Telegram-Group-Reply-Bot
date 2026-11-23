@@ -13,12 +13,13 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError, RetryAfter, Forbidden
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ContextTypes, ChatMemberHandler, filters,
+    ContextTypes, ChatMemberHandler, filters, ApplicationHandlerStop, TypeHandler,
 )
 from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision, add_blocked_word, list_blocked_words, delete_blocked_word
 from moderation import init_moderation_db, get_settings as get_moderation_settings, set_setting as set_moderation_setting, moderate_content, manual_warn, show_warnings, reset_warnings
 from group_features import init_group_features, set_rules_command, rules_command, lock_command, unlock_command
-from owner_control import init_owner_control, owner_command, owner_callback
+from owner_control import (init_owner_control, owner_command, owner_callback,
+                           get_user_restrictions, owner_ban_command, owner_unban_command)
 from relationship import init_relationship, relationship_handlers
 from member_features import (
     init_member_features, track_member_activity, id_command, profile_command,
@@ -42,6 +43,26 @@ logging.basicConfig(
 logger = logging.getLogger("pro-reply-bot")
 FLOOD_TRACKER = defaultdict(deque)
 GROUP_LAST_REPLY = defaultdict(float)
+
+
+async def global_access_guard(update, context):
+    """Apply Bot Owner bans and maintenance mode before normal handlers."""
+    user = update.effective_user
+    if not user or user.is_bot or (OWNER_ID and user.id == OWNER_ID):
+        return
+    maintenance, banned = get_user_restrictions(user.id)
+    if not maintenance and not banned:
+        return
+    notice = "🚫 သင့်အကောင့်ကို Bot အသုံးပြုခွင့် ပိတ်ထားပါတယ်။" if banned else "🛠 Bot ကို Maintenance လုပ်နေပါတယ်။ ခဏနေမှ ပြန်စမ်းပါ။"
+    query = update.callback_query
+    if query:
+        await query.answer(notice, show_alert=True)
+    else:
+        msg = update.effective_message
+        chat = update.effective_chat
+        if msg and chat and (chat.type == "private" or (msg.text or "").startswith("/")):
+            await msg.reply_text(notice)
+    raise ApplicationHandlerStop
 
 
 def init_db():
@@ -210,9 +231,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with db() as conn:
             conn.execute("INSERT OR IGNORE INTO known_users(user_id,first_seen) VALUES(?,?)", (user.id, time.time()))
     await update.effective_message.reply_text(
-        "🤖 PRO Reply Bot Ultimate X\n\n"
-        "Group များအတွက် Smart Auto Reply၊ Admin Tools၊ Security နဲ့ Moderation စနစ်များ ပါဝင်တဲ့ Bot ဖြစ်ပါတယ်။\n\n"
-        "အောက်က Button များကို နှိပ်ပြီး Owner၊ Channel နဲ့ အသုံးပြုနည်းများကို ကြည့်နိုင်ပါတယ်။",
+        "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 𝗕𝗢𝗧 💎\n"
+        "╭━━━━━━━━━━━━━━━━━━━━╮\n"
+        "      ✦ 𝗨𝗟𝗧𝗜𝗠𝗔𝗧𝗘 𝗫 ✦\n"
+        "╰━━━━━━━━━━━━━━━━━━━━╯\n\n"
+        "🤖 Group များအတွက် Smart Auto Reply\n"
+        "🛡️ Admin Tools  •  Security  •  Moderation\n"
+        "👥 Member Tools  •  💾 Database Backup\n\n"
+        "အောက်က Menu ကိုရွေးပြီး အသုံးပြုနိုင်ပါတယ်။",
         reply_markup=start_keyboard(),
     )
 
@@ -222,9 +248,14 @@ async def start_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     if query.data == "start:home":
         await query.edit_message_text(
-            "🤖 PRO Reply Bot Ultimate X\n\n"
-            "Group များအတွက် Smart Auto Reply၊ Admin Tools၊ Security နဲ့ Moderation စနစ်များ ပါဝင်တဲ့ Bot ဖြစ်ပါတယ်။\n\n"
-            "အောက်က Button များကို နှိပ်ပြီး Owner၊ Channel နဲ့ အသုံးပြုနည်းများကို ကြည့်နိုင်ပါတယ်။",
+            "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 𝗕𝗢𝗧 💎\n"
+            "╭━━━━━━━━━━━━━━━━━━━━╮\n"
+            "      ✦ 𝗨𝗟𝗧𝗜𝗠𝗔𝗧𝗘 𝗫 ✦\n"
+            "╰━━━━━━━━━━━━━━━━━━━━╯\n\n"
+            "🤖 Group များအတွက် Smart Auto Reply\n"
+            "🛡️ Admin Tools  •  Security  •  Moderation\n"
+            "👥 Member Tools  •  💾 Database Backup\n\n"
+            "အောက်က Menu ကိုရွေးပြီး အသုံးပြုနိုင်ပါတယ်။",
             reply_markup=start_keyboard(),
         )
         return
@@ -362,8 +393,54 @@ async def ads_command(update, context):
         await ads_opt_out(update, context)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    language = get_settings(chat.id)["language"] if is_group(chat) else "both"
+    if language == "en":
+        english_help = (
+            "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 𝗕𝗢𝗧 — 𝗛𝗘𝗟𝗣\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🤖 AUTO REPLY\n"
+            "/panel — Admin dashboard\n"
+            "/addreply keyword | reply — Add a text reply\n"
+            "/editreply ID | text — Edit a reply\n"
+            "/delreply ID — Delete a reply\n"
+            "/listreplies — List saved replies\n"
+            "/autoreply on|off — Enable or disable replies\n"
+            "/setmode exact|contains|startswith — Match mode\n"
+            "/setchance 0-100 — Reply probability\n"
+            "/setcooldown 0-3600 — Per-user cooldown\n"
+            "/setgroupcooldown 0-3600 — Group cooldown\n"
+            "/setflood 0-30 — Flood reply limit\n\n"
+            "🛡️ SECURITY & MODERATION\n"
+            "/security on|off — Master security switch\n"
+            "/antilink on|off — Link filter\n"
+            "/antispam on|off — Duplicate text filter\n"
+            "/adultfilter on|off — 18+ text filter\n"
+            "/warn — Warn a replied-to member\n"
+            "/warns /resetwarn — Warning history / reset\n"
+            "/addfilterword /listfilterwords /delfilterword — Phrase filter\n\n"
+            "👥 MEMBER & GROUP TOOLS\n"
+            "/id /profile /afk reason /report reason\n"
+            "/reports /closereport ID — Report review\n"
+            "/note text /notes /delnote ID — Personal notes\n"
+            "/setrules text /rules /lock /unlock\n"
+            "/setwelcome on|off /setgoodbye on|off\n"
+            "/setwelcometext /setgoodbyetext — Custom messages\n\n"
+            "🧠 LEARNING & OWNER\n"
+            "/learn on|off /learned /forgetlearned ID\n"
+            "/setlearnthreshold 50-95 — Similarity threshold\n"
+            "/owner — Owner panel\n"
+            "/ownerban USER_ID reason /ownerunban USER_ID\n"
+            "/ad groups|users|all /adstats — Owner broadcast\n"
+            "/backup — Private database backup\n\n"
+            "💡 Media reply: reply to a photo/video/GIF/sticker and send /addreply keyword.\n"
+            "Some protections require the bot to be a group admin with the relevant permissions."
+        )
+        await update.effective_message.reply_text(english_help)
+        return
     text = (
-        "🤖 PRO Reply Bot Ultimate X — Commands\n\n"
+        "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 𝗕𝗢𝗧 — 𝗖𝗢𝗠𝗠𝗔𝗡𝗗 𝗖𝗘𝗡𝗧𝗘𝗥\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
         "Relationship (18+) Commands:\n"
         "/love — Relationship Menu\n"
         "/loveprofile — Profile ထည့်/ပြင် (Private Chat)\n"
@@ -415,6 +492,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setlearnthreshold 50-95 — တူညီမှုအဆင့် သတ်မှတ်ရန်\n"
         "/replysettings — Setting ကြည့်ရန်\n"
         "/stats — စာရင်းအင်း\n"
+        "/ownerban USER_ID အကြောင်းပြချက် — Bot အသုံးပြုခွင့်ပိတ်ရန် (Owner)\n"
+        "/ownerunban USER_ID — Bot အသုံးပြုခွင့်ပြန်ဖွင့်ရန် (Owner)\n"
         "/backup — Database Backup ယူရန်\n"
         "/id — User ID / Chat ID ကြည့်ရန်\n"
         "/profile — Member Profile ကြည့်ရန်\n"
@@ -577,7 +656,10 @@ async def set_lang(update, context):
         await update.effective_message.reply_text("အသုံးပြုပုံ: /setlang my|en|both")
         return
     set_setting(update.effective_chat.id, "language", context.args[0].lower())
-    await update.effective_message.reply_text("🌐 Language setting saved.")
+    await update.effective_message.reply_text(
+        "🌐 Help language: " + {"my": "မြန်မာ", "en": "English", "both": "မြန်မာ + English"}[context.args[0].lower()]
+        + " သတ်မှတ်ပြီးပါပြီ။ /help ကို ပြန်ဖွင့်ကြည့်ပါ။"
+    )
 
 
 async def set_priority(update, context):
@@ -828,7 +910,9 @@ async def panel(update, context):
          InlineKeyboardButton("❔ Help", callback_data="panel:help")],
     ]
     await update.effective_message.reply_text(
-        "🛠 PRO Reply Bot Dashboard\nအောက်က ခလုတ်များကို ရွေးပါ။",
+        "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 — 𝗔𝗗𝗠𝗜𝗡 𝗖𝗢𝗡𝗧𝗥𝗢𝗟\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "အောက်က ခလုတ်များကို ရွေးချယ်ပါ။",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -1012,6 +1096,14 @@ async def handle_text(update, context):
         return
     s = get_settings(chat.id)
     now = time.time()
+    limit = int(s.get("flood_limit", 0))
+    if s["enabled"] and limit:
+        queue = FLOOD_TRACKER[(chat.id, user.id)]
+        while queue and now - queue[0] > 8:
+            queue.popleft()
+        queue.append(now)
+        if len(queue) > limit:
+            return
     learning = get_learning_settings(chat.id)
     if learning["enabled"]:
         try:
@@ -1048,14 +1140,6 @@ async def handle_text(update, context):
         if last and now - last["last_reply"] < s["cooldown"]:
             return
         rows = conn.execute("SELECT * FROM replies WHERE chat_id=? ORDER BY priority DESC,id DESC", (chat.id,)).fetchall()
-    limit = int(s.get("flood_limit", 0))
-    if limit:
-        queue = FLOOD_TRACKER[(chat.id, user.id)]
-        while queue and now - queue[0] > 8:
-            queue.popleft()
-        queue.append(now)
-        if len(queue) > limit:
-            return
     group_cd = int(s.get("group_cooldown", 0))
     if group_cd and now - GROUP_LAST_REPLY[chat.id] < group_cd:
         return
@@ -1194,6 +1278,8 @@ async def post_init(app):
     await app.bot.set_my_commands([
         ("start", "Start bot"),
         ("owner", "Bot Owner control center"),
+        ("ownerban", "Owner: block a user from using the bot"),
+        ("ownerunban", "Owner: restore bot access"),
         ("love", "Relationship system menu"),
         ("loveprofile", "Create or edit 18+ profile"),
         ("lovepublish", "Publish your relationship profile"),
@@ -1270,9 +1356,12 @@ def main():
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    app.add_handler(TypeHandler(Update, global_access_guard), group=-20)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(start_menu_callback, pattern=r"^start:"))
     app.add_handler(CommandHandler("owner", lambda u, c: owner_command(u, c, OWNER_ID)))
+    app.add_handler(CommandHandler("ownerban", lambda u, c: owner_ban_command(u, c, OWNER_ID)))
+    app.add_handler(CommandHandler("ownerunban", lambda u, c: owner_unban_command(u, c, OWNER_ID)))
     for love_handler in relationship_handlers():
         app.add_handler(love_handler)
     app.add_handler(CommandHandler("id", id_command))
