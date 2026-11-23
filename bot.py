@@ -285,7 +285,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             group_id = 0
         if group_id and GAME_WEBAPP_URL:
             await update.effective_message.reply_text(
-                "🎮 NEXUS 3D GAME HUB\nGroup ထဲက သင့် Coin နဲ့ Level ကို အသုံးပြုပြီး ကစားနိုင်ပါပြီ။",
+                "💗 မြအေး 3D GAME HUB\nGroup ထဲက သင့် Coin နဲ့ Level ကို အသုံးပြုပြီး ကစားနိုင်ပါပြီ။",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("🚀 PLAY 3D GAME", web_app=WebAppInfo(url=f"{GAME_WEBAPP_URL}/?chat_id={group_id}"))
                 ]])
@@ -295,14 +295,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.effective_message.reply_text("3D Game Service URL မသတ်မှတ်ရသေးပါ။ Render Blueprint ကို Sync လုပ်ပါ။")
             return
     await update.effective_message.reply_text(
-        "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 𝗕𝗢𝗧 💎\n"
+        "💗 𝗠𝗬𝗔𝗬𝗘 • မြအေး 💗\n"
         "╭━━━━━━━━━━━━━━━━━━━━╮\n"
-        "      ✦ 𝗨𝗟𝗧𝗜𝗠𝗔𝗧𝗘 𝗫 ✦\n"
+        "       ✨ 𝗬𝗢𝗨𝗥 𝗚𝗥𝗢𝗨𝗣 𝗙𝗥𝗜𝗘𝗡𝗗 ✨\n"
         "╰━━━━━━━━━━━━━━━━━━━━╯\n\n"
-        "🤖 Group များအတွက် Smart Auto Reply\n"
-        "🛡️ Admin Tools  •  Security  •  Moderation\n"
-        "👥 Member Tools  •  💾 Database Backup\n\n"
-        "အောက်က Menu ကိုရွေးပြီး အသုံးပြုနိုင်ပါတယ်။",
+        "💬 မြအေးနဲ့ စကားပြောလို့ရတယ်နော်။\n"
+        "🎮 Coin စု၊ Level တက်ပြီး ဂိမ်းတွေလည်း ဆော့လို့ရတယ်။\n"
+        "🎰 Spin • 🎣 Fish • ⚔️ Hunt • 💣 Mines • 🧠 Quiz • 🥊 Duel\n"
+        "🛡️ Auto Reply • Security • Admin Tools လည်း ပါတယ်။\n\n"
+        "မြအေးကို Group ထဲမှာ ခေါ်လိုက်ပါနော် 💗\n"
+        "ဂိမ်းစာရင်းကြည့်ရန် /games ကိုနှိပ်ပါ။",
         reply_markup=start_keyboard(),
     )
 
@@ -312,14 +314,16 @@ async def start_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     if query.data == "start:home":
         await query.edit_message_text(
-            "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 𝗕𝗢𝗧 💎\n"
+            "💗 𝗠𝗬𝗔𝗬𝗘 • မြအေး 💗\n"
             "╭━━━━━━━━━━━━━━━━━━━━╮\n"
-            "      ✦ 𝗨𝗟𝗧𝗜𝗠𝗔𝗧𝗘 𝗫 ✦\n"
+            "       ✨ 𝗬𝗢𝗨𝗥 𝗚𝗥𝗢𝗨𝗣 𝗙𝗥𝗜𝗘𝗡𝗗 ✨\n"
             "╰━━━━━━━━━━━━━━━━━━━━╯\n\n"
-            "🤖 Group များအတွက် Smart Auto Reply\n"
-            "🛡️ Admin Tools  •  Security  •  Moderation\n"
-            "👥 Member Tools  •  💾 Database Backup\n\n"
-            "အောက်က Menu ကိုရွေးပြီး အသုံးပြုနိုင်ပါတယ်။",
+            "💬 မြအေးနဲ့ စကားပြောလို့ရတယ်နော်။\n"
+            "🎮 Coin စု၊ Level တက်ပြီး ဂိမ်းတွေလည်း ဆော့လို့ရတယ်။\n"
+            "🎰 Spin • 🎣 Fish • ⚔️ Hunt • 💣 Mines • 🧠 Quiz • 🥊 Duel\n"
+            "🛡️ Auto Reply • Security • Admin Tools လည်း ပါတယ်။\n\n"
+            "မြအေးကို Group ထဲမှာ ခေါ်လိုက်ပါနော် 💗\n"
+            "ဂိမ်းစာရင်းကြည့်ရန် /games ကိုနှိပ်ပါ။",
             reply_markup=start_keyboard(),
         )
         return
@@ -1242,6 +1246,18 @@ async def handle_text(update, context):
     msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
     if not msg or not msg.text or not is_group(chat) or not user or user.is_bot:
         return
+
+    # Respond whenever a group member calls the bot by its chosen name.
+    normalized_text = " ".join(msg.text.casefold().split())
+    if "မြအေး" in normalized_text:
+        call_replies = [
+            "ရှင် 😄 မြအေး ဒီမှာရှိတယ်နော်။ စကားပြောလို့ရတယ်၊ Coin နဲ့ ဂိမ်းတွေလည်း အတူဆော့လို့ရတယ်။ /games လို့ရိုက်ပြီး ဂိမ်းတွေကြည့်လိုက်နော် 💗",
+            "ဟုတ်ကဲ့ရှင် 💗 မြအေးကို ခေါ်တာလား။ ဘာပြောမလဲ။ Quiz / Spin / Fish / Hunt / Mines / Duel လည်း အတူဆော့ကြမယ်နော်။",
+            "မြအေးရှိပါတယ်ရှင် 🥰 စကားလာပြောလို့ရတယ်နော်။ ဂိမ်းဆော့ချင်ရင် /games ကိုနှိပ်လိုက်ပါ။",
+        ]
+        await msg.reply_text(random.choice(call_replies), reply_to_message_id=msg.message_id)
+        return
+
     s = get_settings(chat.id)
     now = time.time()
     limit = int(s.get("flood_limit", 0))
@@ -1423,6 +1439,18 @@ async def owner_security_callback(update, context):
         await update.callback_query.answer()
 
 async def post_init(app):
+    # Keep the Telegram profile identity synchronized with the in-chat persona.
+    try:
+        await app.bot.set_my_name("မြအေး")
+        await app.bot.set_my_description(
+            "မြအေးပါ 💗 Group ထဲမှာ စကားပြောနိုင်ပြီး Coin စနစ်နဲ့ Quiz, Spin, Fish, Hunt, Mines, Duel ဂိမ်းတွေ ဆော့နိုင်ပါတယ်။"
+        )
+        await app.bot.set_my_short_description(
+            "မြအေးနဲ့ စကားပြောမယ်၊ Coin နဲ့ ဂိမ်းတွေဆော့မယ် 💗"
+        )
+    except TelegramError:
+        logger.exception("Could not update Telegram bot profile name/description")
+
     await app.bot.set_my_commands([
         ("start", "Start bot"),
         ("owner", "Bot Owner control center"),
