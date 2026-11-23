@@ -359,7 +359,7 @@ async def start_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         "• /security on|off — Security ဖွင့်/ပိတ်ရန်\n"
         "• /rules — Group စည်းကမ်းကြည့်ရန်\n"
         "• /love — Relationship Menu\n\n"
-        "အသုံးပြုနိုင်သော Command အားလုံးကို /help မှာ ကြည့်နိုင်ပါတယ်။"
+        "🎁 Coin Code ရရှိထားလျှင် /redeem CODE ဖြင့် Coin ရယူနိုင်ပါတယ်။\n\n"        "အသုံးပြုနိုင်သော Command အားလုံးကို /help မှာ ကြည့်နိုင်ပါတယ်။"
     )
     await query.edit_message_text(
         help_text,
