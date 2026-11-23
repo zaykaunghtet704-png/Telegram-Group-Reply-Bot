@@ -639,13 +639,17 @@ async def mine_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.from_user.id != owner_id:
         await query.answer("ဒီ Mine Game ကစားသူအတွက်ပဲ ဖြစ်ပါတယ်။", show_alert=True)
         return
-    await query.answer()
     with db() as conn:
         game = conn.execute("SELECT * FROM game_mines WHERE chat_id=? AND user_id=?", (chat_id, owner_id)).fetchone()
     if not game:
+        await query.answer("ဒီ Mine Game ပြီးဆုံးသွားပါပြီ။", show_alert=True)
         await query.edit_message_text(_hud_text("💣 ဒီ Mine Game ပြီးဆုံးသွားပါပြီ။ /mines BET ဖြင့် အသစ်စပါ။"))
         return
     mines_set, opened = set(json.loads(game["mines"])), set(json.loads(game["opened"]))
+    if action == "cash" and not opened:
+        await query.answer("အနည်းဆုံး Safe အကွက် ၁ ခု ဖွင့်ပါ။", show_alert=True)
+        return
+    await query.answer()
     if action == "open":
         if not 1 <= cell <= 25:
             return
@@ -677,9 +681,6 @@ async def mine_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=_mine_keyboard(owner_id, opened))
         return
     if action == "cash":
-        if not opened:
-            await query.answer("အနည်းဆုံး Safe အကွက် ၁ ခု ဖွင့်ပါ။", show_alert=True)
-            return
         multiplier = _mine_multiplier(len(opened))
         payout = int(int(game["bet"]) * multiplier)
         with db() as conn:
@@ -942,7 +943,8 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
             wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (challenger,)).fetchone()
             if wallet:
                 conn.execute("UPDATE game_accounts SET coins=? WHERE user_id=?", (int(wallet["coins"]), challenger))
-            await update.effective_message.reply_text(_hud_text("❌ သင့် Coin မလုံလောက်ပါ။")); return
+            conn.execute("DELETE FROM game_duels WHERE chat_id=?", (chat_id,))
+            await update.effective_message.reply_text(_hud_text("❌ သင့် Coin မလုံလောက်ပါ။ Duel ပယ်ဖျက်လိုက်ပါပြီ။")); return
         conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
         for wallet_user_id in (challenger, user.id):
             wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (wallet_user_id,)).fetchone()
