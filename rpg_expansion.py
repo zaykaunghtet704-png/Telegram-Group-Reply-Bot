@@ -53,7 +53,10 @@ async def guild_create_command(update, context):
         if conn.execute("SELECT 1 FROM rpg_guilds WHERE LOWER(name)=LOWER(?)", (name,)).fetchone():
             await update.effective_message.reply_text("ဒီ Guild အမည်ကို အသုံးပြုပြီးသားပါ။")
             return
-        row = conn.execute("INSERT INTO rpg_guilds(name,owner_id) VALUES(?,?) RETURNING guild_id", (name,user.id)).fetchone()
+        row = conn.execute("INSERT INTO rpg_guilds(name,owner_id) VALUES(?,?) ON CONFLICT DO NOTHING RETURNING guild_id", (name,user.id)).fetchone()
+        if not row:
+            await update.effective_message.reply_text("ဒီ Guild အမည်ကို အသုံးပြုပြီးသားပါ။ နာမည်အသစ်ရွေးပါ။")
+            return
         conn.execute("INSERT INTO rpg_guild_members(user_id,guild_id) VALUES(?,?)", (user.id,row["guild_id"]))
     await update.effective_message.reply_text(f"🛡️ GUILD CREATED\n🏰 {name}\n🆔 ID: {int(row['guild_id'])}\nဝင်ရန် /guildjoin {int(row['guild_id'])}")
 
@@ -207,9 +210,9 @@ async def world_boss_attack_command(update, context):
         member = conn.execute("SELECT guild_id FROM rpg_guild_members WHERE user_id=?",(user.id,)).fetchone()
         if member: conn.execute("UPDATE rpg_guilds SET total_xp=total_xp+? WHERE guild_id=?",(damage,member["guild_id"]))
         xp = 12
-        conn.execute("""INSERT INTO rpg_stats(user_id,games_played,total_xp) VALUES(?,1,?)
-            ON CONFLICT(user_id) DO UPDATE SET games_played=rpg_stats.games_played+1,
-            total_xp=rpg_stats.total_xp+EXCLUDED.total_xp,updated_at=CURRENT_TIMESTAMP""",(user.id,xp))
+        conn.execute("""INSERT INTO rpg_stats(user_id,total_xp) VALUES(?,?)
+            ON CONFLICT(user_id) DO UPDATE SET total_xp=rpg_stats.total_xp+EXCLUDED.total_xp,
+            updated_at=CURRENT_TIMESTAMP""",(user.id,xp))
         conn.execute("INSERT INTO game_wallets(user_id,coins) VALUES(?,100) ON CONFLICT(user_id) DO NOTHING",(user.id,))
         bonus = 500 if int(result["defeated"]) else 0
         reward = 40+damage//4+bonus
