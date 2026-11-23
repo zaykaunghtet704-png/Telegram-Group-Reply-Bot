@@ -6,13 +6,56 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
-:root{color-scheme:dark;--cyan:#61e7ef;--gold:#ffd36a;--panel:#101f31dd}*{box-sizing:border-box}body{margin:0;background:#07111f;color:#f5f8ff;font-family:system-ui,-apple-system,sans-serif;overflow:hidden}#scene{position:fixed;inset:0;z-index:0}#hud{position:fixed;inset:0;z-index:2;pointer-events:none;padding:12px;display:flex;flex-direction:column;justify-content:space-between}.top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.panel{background:var(--panel);border:1px solid #8ceaf044;backdrop-filter:blur(12px);border-radius:16px;padding:10px 13px;box-shadow:0 8px 28px #0005}.brand{font-weight:900;letter-spacing:1px;color:var(--cyan)}.stats{font-size:13px;line-height:1.65}.bottom{display:flex;justify-content:space-between;align-items:end;gap:12px}.controls{display:flex;gap:8px;pointer-events:auto;flex-wrap:wrap;justify-content:flex-end}.btn{border:1px solid #75eaf066;background:#142a40eF;color:white;border-radius:14px;padding:12px 14px;font-weight:800;min-width:74px;box-shadow:0 5px 16px #0005}.btn:active{transform:scale(.95);background:#24516b}.btn.gold{background:#60451b;border-color:#ffd36a}.joy{width:118px;height:118px;border-radius:50%;background:#d7f9ff22;border:2px solid #d7f9ff66;position:relative;pointer-events:auto;touch-action:none}.knob{width:44px;height:44px;border-radius:50%;background:#61e7efbb;position:absolute;left:35px;top:35px;box-shadow:0 0 20px #61e7ef88}.overlay{position:fixed;inset:0;z-index:5;background:#030914df;display:flex;align-items:center;justify-content:center;padding:18px}.modal{width:min(480px,100%);background:#102238;border:1px solid #61e7ef55;border-radius:22px;padding:20px;max-height:90vh;overflow:auto}.title{font-size:24px;font-weight:900;margin:0 0 8px}.muted{color:#a9bed2;font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.tile{padding:15px 10px;border-radius:16px;text-align:left;min-height:100px;background:linear-gradient(145deg,#183a52,#111d31);border:1px solid #65dfea44;color:white}.tile b{display:block;font-size:16px;margin:6px 0}.tile span{font-size:28px}.hidden{display:none!important}#notice{position:fixed;z-index:8;top:44%;left:50%;transform:translate(-50%,-50%);background:#071827ed;border:1px solid #6ce8ed;padding:16px 20px;border-radius:16px;text-align:center;max-width:85%;display:none}.small{font-size:12px;color:#b5c8d8}.actionrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actionrow button{flex:1}
+:root{color-scheme:dark;--cyan:#73f4ff;--gold:#ffd778;--violet:#a78bfa;--panel:rgba(7,19,38,.78);--line:rgba(130,232,255,.28)}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 50% 0%,#173c66 0%,#07111f 58%,#030711 100%);color:#f7fbff;font-family:system-ui,-apple-system,sans-serif;overflow:hidden}
+#scene{position:fixed;inset:0;z-index:0}
+#scene:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(4,12,27,.1),transparent 40%,rgba(3,8,20,.42))}
+#hud{position:fixed;inset:0;z-index:2;pointer-events:none;padding:14px;display:flex;flex-direction:column;justify-content:space-between}
+.top{display:flex;justify-content:space-between;gap:9px;align-items:flex-start}
+.panel{background:linear-gradient(145deg,rgba(23,54,83,.88),rgba(5,17,34,.82));border:1px solid var(--line);backdrop-filter:blur(16px);border-radius:18px;padding:11px 14px;box-shadow:0 12px 34px #0008,inset 0 1px #ffffff20}
+.brand{font-weight:1000;letter-spacing:1.8px;color:var(--cyan);text-shadow:0 0 18px #61e7ef99}
+.stats{font-size:13px;line-height:1.7}
+.bottom{display:flex;justify-content:space-between;align-items:end;gap:12px}
+.controls{display:flex;gap:9px;pointer-events:auto;flex-wrap:wrap;justify-content:flex-end}
+.btn{border:1px solid #8beeff70;background:linear-gradient(155deg,#244b70,#10233d 70%);color:white;border-radius:14px;padding:12px 15px;font-weight:900;min-width:76px;box-shadow:0 7px 0 #071321,0 12px 25px #0008,inset 0 1px #ffffff35;transition:transform .15s,filter .15s}
+.btn:active{transform:translateY(5px);box-shadow:0 2px 0 #071321,0 5px 12px #0008;filter:brightness(1.2)}
+.btn.gold{background:linear-gradient(145deg,#b77a25,#674015);border-color:#ffe29a;box-shadow:0 7px 0 #38220d,0 12px 25px #0008,inset 0 1px #fff8}
+.joy{width:118px;height:118px;border-radius:50%;background:radial-gradient(circle at 35% 25%,#b6faff55,#1a416a99 70%);border:2px solid #b6faff88;position:relative;pointer-events:auto;touch-action:none;box-shadow:0 0 25px #61e7ef33,inset 0 5px 18px #0007}
+.knob{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 30% 25%,#e7ffff,#48cbdc 55%,#16718b);position:absolute;left:35px;top:35px;box-shadow:0 0 22px #61e7efbb,0 5px 12px #0008}
+.overlay{position:fixed;inset:0;z-index:5;background:radial-gradient(ellipse at 50% 20%,#173c65b8,#020711ed 75%);display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(7px)}
+.modal{width:min(500px,100%);background:linear-gradient(150deg,rgba(22,48,76,.97),rgba(5,14,29,.98));border:1px solid #78eaff70;border-radius:25px;padding:20px;max-height:91vh;overflow:auto;box-shadow:0 25px 80px #000b,inset 0 1px #ffffff20;position:relative}
+.modal:before{content:"";position:absolute;inset:0 18% auto;height:1px;background:linear-gradient(90deg,transparent,#a7f7ff,transparent)}
+.title{font-size:clamp(22px,6vw,29px);font-weight:1000;margin:0 0 7px;letter-spacing:.3px;text-shadow:0 3px 18px #56dff555}
+.muted{color:#b5cce1;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:18px}
+.tile{position:relative;overflow:hidden;padding:15px 12px;border-radius:19px;text-align:left;min-height:116px;background:linear-gradient(145deg,#285477 0%,#142d4a 48%,#0b172b 100%);border:1px solid #85eaff55;color:white;box-shadow:0 7px 0 #06101e,0 13px 24px #0007,inset 0 1px #ffffff38;transition:transform .18s,filter .18s}
+.tile:before{content:"";position:absolute;inset:-40% -20%;background:linear-gradient(115deg,transparent 35%,#ffffff18 48%,transparent 60%);transform:translateX(-45%);transition:transform .4s}
+.tile:active{transform:translateY(5px) scale(.985);box-shadow:0 2px 0 #06101e,0 5px 12px #0007}
+.tile span{display:block;font-size:34px;filter:drop-shadow(0 5px 7px #0009);margin-bottom:5px}
+.tile b{display:block;font-size:15px;margin:4px 0;letter-spacing:.4px}
+.tile small{font-size:11px;color:#c2d8e9}
+.tile:nth-child(2){background:linear-gradient(145deg,#68413e,#34213c 55%,#17182e)}
+.tile:nth-child(3){background:linear-gradient(145deg,#315c75,#1a3154 55%,#111b35)}
+.tile:nth-child(4){background:linear-gradient(145deg,#725128,#3d2b28 55%,#1c1a2b)}
+.tile:nth-child(5){background:linear-gradient(145deg,#60458c,#30234f 55%,#15162f)}
+.hidden{display:none!important}
+#notice{position:fixed;z-index:8;top:44%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(145deg,#163957,#071426);border:1px solid #6ce8ed;padding:16px 20px;border-radius:17px;text-align:center;max-width:85%;display:none;box-shadow:0 12px 40px #000b}
+.small{font-size:12px;color:#b5c8d8}
+.actionrow{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.actionrow button{flex:1}
+#gameBody{line-height:1.65}
+#gameBody .btn{margin-top:7px}
+#gameBody h3{font-size:19px;text-shadow:0 0 15px #6beaff66}
+#gameBody .quizOpt{min-height:46px;text-align:left}
+@media(max-width:380px){#hud{padding:9px}.panel{padding:8px 10px}.stats{font-size:11px}.joy{width:98px;height:98px}.knob{left:26px;top:26px}.grid{gap:8px}.tile{min-height:108px;padding:12px 9px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 </style></head>
 <body>
 <div id="scene"></div>
 <div id="hud">
  <div class="top">
-  <div class="panel"><div class="brand">NEXUS 3D WORLD</div><div class="stats" id="player">Loading player…</div></div>
+  <div class="panel"><div class="brand">✦ MYAAYE 3D WORLD ✦</div><div class="stats" id="player">Loading player…</div></div>
   <div class="panel stats" id="wallet">🪙 —</div>
  </div>
  <div class="bottom">
@@ -25,13 +68,13 @@
  </div>
 </div>
 <div class="overlay" id="menuLayer"><div class="modal">
- <p class="brand">NEXUS • 3D GAME HUB</p><h1 class="title">Choose Your World</h1><p class="muted">3D Mini Games · Group Coins · XP & Levels</p>
+ <p class="brand">✦ MYAAYE • 3D UNIVERSE ✦</p><h1 class="title">Choose Your Arena</h1><p class="muted">⚡ Immersive 3D World · Coin Rewards · XP Progression</p>
  <div class="grid">
   <button class="tile" data-mode="fish"><span>🎣</span><b>Fishing Lake</b><small>ငါးမျှားပြီး Coin ရယူပါ</small></button>
   <button class="tile" data-mode="hunt"><span>⚔️</span><b>Monster Hunt</b><small>Monster ကို တိုက်ခိုက်ပါ</small></button>
   <button class="tile" data-mode="quiz"><span>🧠</span><b>Quiz Battle</b><small>မေးခွန်းဖြေပြီး Coin ရယူပါ</small></button>
   <button class="tile" data-mode="spin"><span>🎰</span><b>Lucky Spin</b><small>ဆုဘီး လှည့်ပါ</small></button>
-  <button class="tile" data-mode="duel" style="grid-column:span 2"><span>🥊</span><b>1v1 Duel</b><small>Multiplayer Arena — အဆင့်ဆင့် ချိတ်ဆက်နေဆဲ</small></button>
+  <button class="tile" data-mode="duel" style="grid-column:span 2"><span>🥊</span><b>1v1 Duel</b><small>Multiplayer Arena • Challenge your rival</small></button>
  </div><div class="actionrow"><button class="btn" id="closeMenu">WORLD ထဲဝင်မယ်</button></div>
  <p class="small">Joystick ကို ဆွဲပြီး Character ကို လှုပ်ရှားပါ။ Game ဆုတွေကို Bot ရဲ့ Group Coin ထဲ သိမ်းပါတယ်။</p>
  </div></div>
