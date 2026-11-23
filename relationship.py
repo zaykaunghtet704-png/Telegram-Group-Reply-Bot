@@ -308,7 +308,7 @@ async def delete_posts_command(update, context):
             failed += 1
 
     await msg.reply_text(
-        "🗑️ Relationship Post ဖျက်ခြင်း ပြီးပါပြီ။\\n"
+        "🗑️ Relationship Post ဖျက်ခြင်း ပြီးပါပြီ။\n"
         f"ဖျက်နိုင်: {deleted} ခု\\n"
         f"မဖျက်နိုင်: {failed} ခု\\n"
         "မဖျက်နိုင်သော Post များသည် Bot Permission သို့မဟုတ် Telegram သတ်မှတ်ချက်ကြောင့် ဖြစ်နိုင်ပါသည်။"
