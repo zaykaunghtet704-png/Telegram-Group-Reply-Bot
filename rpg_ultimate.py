@@ -238,6 +238,22 @@ async def rpg_ultimate_callback(update, context):
     await query.answer()
     action = (query.data or "").partition(":")[2]
 
+    if action == "menu":
+        await query.edit_message_text(
+            "🌌╭━━ MYAE ULTIMATE RPG ━━╮\\n"
+            "⚔️ Dungeon Raid • 🌟 Hero Summon\\n"
+            "💎 Treasure Expedition • 🎒 Hero Collection\\n"
+            "━━━━━━━━━━━━━━━━━━━━\\n"
+            "ကစားနည်းတစ်ခုကို ရွေးချယ်ပါ။",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏰 Dungeon Raid", callback_data="rpgx:dungeon")],
+                [InlineKeyboardButton("🌟 Hero Summon", callback_data="rpgx:summon"),
+                 InlineKeyboardButton("🎒 My Heroes", callback_data="rpgx:heroes")],
+                [InlineKeyboardButton("💎 Treasure Hunt", callback_data="rpgx:treasure")],
+                [InlineKeyboardButton("🏠 RPG Profile", callback_data="rpg:profile")],
+            ]),
+        )
+        return
     if action == "summon":
         await summon_command(update, context)
         return
