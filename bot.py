@@ -841,10 +841,41 @@ async def bot_membership_update(update, context):
         return
     old_status = change.old_chat_member.status
     new_status = change.new_chat_member.status
-    if new_status not in ("member", "administrator") or old_status not in ("left", "kicked"):
+    joined = old_status in ("left", "kicked") and new_status in ("member", "administrator")
+    promoted = old_status in ("member", "restricted") and new_status == "administrator"
+    demoted = old_status == "administrator" and new_status == "member"
+    removed = old_status in ("member", "administrator") and new_status in ("left", "kicked")
+    if not (joined or promoted or demoted or removed):
         return
 
     actor = change.from_user
+    if joined or promoted:
+        with db() as conn:
+            conn.execute(
+                "INSERT INTO known_groups(chat_id,title,first_seen,active) VALUES(?,?,?,1) "
+                "ON CONFLICT(chat_id) DO UPDATE SET title=excluded.title,active=1",
+                (chat.id, chat.title or "", time.time()),
+            )
+    if removed:
+        with db() as conn:
+            conn.execute("UPDATE known_groups SET active=0 WHERE chat_id=?", (chat.id,))
+        try:
+            await context.bot.send_message(
+                OWNER_ID,
+                f"⚠️ Bot ကို Group မှ ဖယ်ရှားလိုက်ပါပြီ။\\nGroup: {chat.title or 'Unknown'}\\nGroup ID: {chat.id}\\nလုပ်ဆောင်သူ: {actor.full_name} ({actor.id})",
+            )
+        except TelegramError:
+            logger.exception("Could not notify Bot Owner about bot removal")
+        return
+    if demoted:
+        try:
+            await context.bot.send_message(
+                OWNER_ID,
+                f"⚠️ Bot ကို Group Admin အဖြစ်မှ ဖြုတ်လိုက်ပါပြီ။\\nGroup: {chat.title or 'Unknown'}\\nGroup ID: {chat.id}\\nလုပ်ဆောင်သူ: {actor.full_name} ({actor.id})",
+            )
+        except TelegramError:
+            logger.exception("Could not notify Bot Owner about bot demotion")
+        return
     bot_member = change.new_chat_member
     admin_text = "Admin" if new_status == "administrator" else "Admin မဟုတ်သေးပါ"
     group_link = "မရနိုင်သေးပါ (Private Group သို့မဟုတ် Link မရနိုင်)"
