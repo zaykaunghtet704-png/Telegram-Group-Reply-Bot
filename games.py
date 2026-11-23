@@ -253,8 +253,8 @@ def _hud_text(value):
     divider = "┣━━━━━━━━━━━━━━━━━━━━━━┫"
     footer = "╰━━━━━━━━━━━━━━━━━━━━━━╯"
     depth = "   ▰ ▰ ▰  ✧  NEXUS SYSTEM"
-    content = "\\n".join(f"┃  {line}" if line else "┃" for line in details)
-    return "\\n".join([top, header, divider, content, footer, depth])
+    content = "\n".join(f"┃  {line}" if line else "┃" for line in details)
+    return "\n".join([top, header, divider, content, footer, depth])
 
 
 async def _animate_hud(message, frames, delay=0.12):
