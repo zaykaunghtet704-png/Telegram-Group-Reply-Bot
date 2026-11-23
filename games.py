@@ -66,6 +66,38 @@ def init_games():
             last_daily DOUBLE PRECISION NOT NULL DEFAULT 0,
             PRIMARY KEY(chat_id, user_id)
         )""")
+        # One wallet per Telegram user, shared across every group.
+        conn.execute("""CREATE TABLE IF NOT EXISTS game_wallets (
+            user_id BIGINT PRIMARY KEY,
+            coins BIGINT NOT NULL DEFAULT 100
+        )""")
+        # Merge old group balances without multiplying duplicate starter balances.
+        conn.execute("""
+            INSERT INTO game_wallets(user_id, coins)
+            SELECT user_id, MAX(coins) FROM game_accounts GROUP BY user_id
+            ON CONFLICT(user_id) DO NOTHING
+        """)
+        # Keep legacy game_accounts coin columns synchronized for older game logic.
+        conn.execute("""CREATE OR REPLACE FUNCTION sync_game_wallet_from_account()
+            RETURNS trigger AS $
+            BEGIN
+                INSERT INTO game_wallets(user_id, coins)
+                VALUES (NEW.user_id, NEW.coins)
+                ON CONFLICT(user_id) DO UPDATE SET coins=EXCLUDED.coins;
+                UPDATE game_accounts
+                   SET coins=NEW.coins
+                 WHERE user_id=NEW.user_id
+                   AND (chat_id<>NEW.chat_id OR coins<>NEW.coins);
+                RETURN NEW;
+            END;
+            $ LANGUAGE plpgsql
+        """)
+        conn.execute("DROP TRIGGER IF EXISTS game_accounts_wallet_sync ON game_accounts")
+        conn.execute("""CREATE TRIGGER game_accounts_wallet_sync
+            AFTER UPDATE OF coins ON game_accounts
+            FOR EACH ROW WHEN (OLD.coins IS DISTINCT FROM NEW.coins)
+            EXECUTE FUNCTION sync_game_wallet_from_account()
+        """)
         conn.execute("""CREATE TABLE IF NOT EXISTS game_cooldowns (
             chat_id BIGINT NOT NULL,
             user_id BIGINT NOT NULL,
@@ -136,12 +168,26 @@ def _account(chat_id, user):
             "INSERT OR IGNORE INTO game_accounts(chat_id,user_id,username,display_name,coins) VALUES(?,?,?,?,?)",
             (chat_id, user.id, user.username or "", _display(user), STARTING_COINS),
         )
+        # Existing users keep their highest old group balance; new users start once.
+        conn.execute(
+            "INSERT INTO game_wallets(user_id,coins) "
+            "SELECT user_id,MAX(coins) FROM game_accounts WHERE user_id=? GROUP BY user_id "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (user.id,),
+        )
+        wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)).fetchone()
+        conn.execute(
+            "UPDATE game_accounts SET coins=? WHERE user_id=? AND coins<>?",
+            (int(wallet["coins"]), user.id, int(wallet["coins"])),
+        )
         conn.execute(
             "UPDATE game_accounts SET username=?,display_name=? WHERE chat_id=? AND user_id=?",
             (user.username or "", _display(user), chat_id, user.id),
         )
         return conn.execute(
-            "SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",
+            "SELECT ga.*, gw.coins AS coins FROM game_accounts ga "
+            "JOIN game_wallets gw ON gw.user_id=ga.user_id "
+            "WHERE ga.chat_id=? AND ga.user_id=?",
             (chat_id, user.id),
         ).fetchone()
 
@@ -212,13 +258,19 @@ def _stake(chat_id, user, amount):
     _account(chat_id, user)
     with db() as conn:
         result = conn.execute(
-            "UPDATE game_accounts SET coins=coins-? WHERE chat_id=? AND user_id=? AND coins>=?",
-            (amount, chat_id, user.id, amount),
+            "UPDATE game_wallets SET coins=coins-? WHERE user_id=? AND coins>=?",
+            (amount, user.id, amount),
         )
         if result.rowcount != 1:
             return None
+        conn.execute(
+            "UPDATE game_accounts SET coins=(SELECT coins FROM game_wallets WHERE user_id=?) "
+            "WHERE user_id=? AND coins<>(SELECT coins FROM game_wallets WHERE user_id=?)",
+            (user.id, user.id, user.id),
+        )
         return conn.execute(
-            "SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",
+            "SELECT ga.*,gw.coins AS coins FROM game_accounts ga "
+            "JOIN game_wallets gw ON gw.user_id=ga.user_id WHERE ga.chat_id=? AND ga.user_id=?",
             (chat_id, user.id),
         ).fetchone()
 
@@ -369,9 +421,13 @@ async def topcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     with db() as conn:
         rows = conn.execute(
-            "SELECT display_name,coins,xp,wins FROM game_accounts WHERE chat_id=? "
-            "ORDER BY coins DESC, xp DESC LIMIT 10",
-            (update.effective_chat.id,),
+            "SELECT names.display_name, w.coins, COALESCE(stats.xp,0) AS xp "
+            "FROM game_wallets w "
+            "LEFT JOIN (SELECT user_id, MAX(display_name) AS display_name FROM game_accounts GROUP BY user_id) names "
+            "ON names.user_id=w.user_id "
+            "LEFT JOIN (SELECT user_id, SUM(xp) AS xp FROM game_accounts GROUP BY user_id) stats "
+            "ON stats.user_id=w.user_id "
+            "ORDER BY w.coins DESC, COALESCE(stats.xp,0) DESC LIMIT 10"
         ).fetchall()
     if not rows:
         await update.effective_message.reply_text(_hud_text("🏆 Leaderboard မရှိသေးပါ။"))
@@ -401,7 +457,7 @@ async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.execute("INSERT INTO game_quizzes(chat_id,question,options,answer,expires_at) VALUES(?,?,?,?,?) ON CONFLICT(chat_id) DO UPDATE SET question=excluded.question,options=excluded.options,answer=excluded.answer,expires_at=excluded.expires_at",(chat_id,q,json.dumps(opts,ensure_ascii=False),ans,time.time()+90))
         active={"question":q,"options":json.dumps(opts,ensure_ascii=False)}
     if _stake(chat_id,user,bet) is None:
-        with db() as conn: bal=conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
+        with db() as conn: bal=conn.execute("SELECT coins FROM game_wallets WHERE user_id=?",(user.id,)).fetchone()
         await update.effective_message.reply_text(_hud_text(f"❌ Coin မလုံလောက်ပါ။ လက်ကျန် {int(bal['coins']):,}")); return
     with db() as conn: conn.execute("INSERT INTO game_quiz_players(chat_id,user_id,bet,joined_at) VALUES(?,?,?,?)",(chat_id,user.id,bet,time.time()))
     msg=await update.effective_message.reply_text(_hud_text("🧠 QUIZ ARENA\n🔍 မေးခွန်း Load လုပ်နေသည်..."))
@@ -645,13 +701,19 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _account(chat_id, user)
     with db() as conn:
         debit = conn.execute(
-            "UPDATE game_accounts SET coins=coins-? WHERE chat_id=? AND user_id=? AND coins>=?",
-            (bet, chat_id, user.id, bet),
+            "UPDATE game_wallets SET coins=coins-? WHERE user_id=? AND coins>=?",
+            (bet, user.id, bet),
         )
+        if debit.rowcount == 1:
+            conn.execute(
+                "UPDATE game_accounts SET coins=(SELECT coins FROM game_wallets WHERE user_id=?) "
+                "WHERE user_id=? AND coins<>(SELECT coins FROM game_wallets WHERE user_id=?)",
+                (user.id, user.id, user.id),
+            )
         if debit.rowcount != 1:
             row = conn.execute(
-                "SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",
-                (chat_id, user.id),
+                "SELECT coins FROM game_wallets WHERE user_id=?",
+                (user.id,),
             ).fetchone()
             balance_now = int(row["coins"]) if row else 0
             await update.effective_message.reply_text(_hud_text(
@@ -761,17 +823,22 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row=conn.execute("SELECT * FROM game_duels WHERE chat_id=?",(chat_id,)).fetchone()
         if not row or float(row["created_at"])<time.time()-300:
             conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
+        conn.execute(
+            "UPDATE game_accounts SET coins=(SELECT coins FROM game_wallets WHERE user_id=game_accounts.user_id) "
+            "WHERE user_id IN (?,?) AND coins<>(SELECT coins FROM game_wallets WHERE user_id=game_accounts.user_id)",
+            (challenger, user.id),
+        )
             await update.effective_message.reply_text(_hud_text("🥊 လက်ခံနိုင်တဲ့ Duel မရှိပါ။")); return
         if int(row["opponent_id"])!=user.id:
             await update.effective_message.reply_text(_hud_text("စိန်ခေါ်ခံရသူသာ လက်ခံနိုင်ပါတယ်။")); return
         wager=int(row["wager"] or 0); challenger=int(row["challenger_id"])
-        d1=conn.execute("UPDATE game_accounts SET coins=coins-? WHERE chat_id=? AND user_id=? AND coins>=?",(wager,chat_id,challenger,wager))
+        d1=conn.execute("UPDATE game_wallets SET coins=coins-? WHERE user_id=? AND coins>=?",(wager,challenger,wager))
         if d1.rowcount!=1:
             conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
             await update.effective_message.reply_text(_hud_text("❌ စိန်ခေါ်သူ Coin မလုံလောက်လို့ Duel ပယ်ဖျက်သည်။")); return
-        d2=conn.execute("UPDATE game_accounts SET coins=coins-? WHERE chat_id=? AND user_id=? AND coins>=?",(wager,chat_id,user.id,wager))
+        d2=conn.execute("UPDATE game_wallets SET coins=coins-? WHERE user_id=? AND coins>=?",(wager,user.id,wager))
         if d2.rowcount!=1:
-            conn.execute("UPDATE game_accounts SET coins=coins+? WHERE chat_id=? AND user_id=?",(wager,chat_id,challenger))
+            conn.execute("UPDATE game_wallets SET coins=coins+? WHERE user_id=?",(wager,challenger))
             await update.effective_message.reply_text(_hud_text("❌ သင့် Coin မလုံလောက်ပါ။")); return
         conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
     winner=random.choice([challenger,user.id]); loser=user.id if winner==challenger else challenger
