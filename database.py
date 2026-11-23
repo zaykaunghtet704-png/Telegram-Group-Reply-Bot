@@ -28,6 +28,7 @@ MIGRATION_TABLES = (
     "coin_codes", "coin_code_redemptions",
     "rpg_stats", "rpg_missions", "rpg_inventory", "rpg_loadout",
     "rpg_daily_claims", "rpg_adventure_cooldowns",
+    "rpg_guilds", "rpg_guild_members", "rpg_world_boss", "rpg_boss_cooldowns", "rpg_boss_damage", "rpg_equipment", "rpg_equipment_loadout",
 )
 
 
