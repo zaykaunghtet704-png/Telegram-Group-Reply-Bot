@@ -33,6 +33,7 @@ from learning import (
 )
 from coin_codes import (init_coin_codes, create_coin_code, redeem_coin_code, revoke_coin_code, coin_code_stats)
 from rpg import (init_rpg, rpg_profile, missions_command, mission_claim_command, achievements_command, shop_command, buy_command, inventory_command, equip_command, rpg_daily_command, adventure_command, rpg_top_command)
+from rpg_expansion import (init_rpg_expansion, guild_create_command, guild_join_command, guild_leave_command, guild_command, guild_top_command, gear_command, gear_buy_command, gear_equip_command, world_boss_command, world_boss_attack_command)
 from games import (
     init_games, set_games_enabled, game_help, balance, rank, toprank, daily, topcoins,
     quiz, answer, fish, hunt, mines, mine_callback, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
@@ -79,7 +80,7 @@ async def global_access_guard(update, context):
             "/games", "/balance", "/rank", "/daily", "/topcoins", "/toprank",
             "/quiz", "/answer", "/fish", "/hunt", "/spin", "/mines",
             "/pick", "/cashout", "/duel", "/duelaccept", "/dueldecline", "/redeem",
-            "/rpg", "/missions", "/missionclaim", "/achievements", "/shop", "/buy", "/inventory", "/equip", "/rpgdaily", "/adventure", "/rpgtop",
+            "/rpg", "/missions", "/missionclaim", "/achievements", "/shop", "/buy", "/inventory", "/equip", "/rpgdaily", "/adventure", "/rpgtop", "/guildcreate", "/guildjoin", "/guildleave", "/guild", "/guildtop", "/gear", "/gearbuy", "/gearequip", "/boss", "/bossattack",
             "/game",
         }
         if command in game_commands:
@@ -1749,6 +1750,7 @@ def main():
     init_relationship()
     init_games()
     init_rpg()
+    init_rpg_expansion()
     init_coin_codes()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
@@ -1793,6 +1795,16 @@ def main():
     app.add_handler(CommandHandler("rpgdaily", rpg_daily_command))
     app.add_handler(CommandHandler("adventure", adventure_command))
     app.add_handler(CommandHandler("rpgtop", rpg_top_command))
+    app.add_handler(CommandHandler("guildcreate", guild_create_command))
+    app.add_handler(CommandHandler("guildjoin", guild_join_command))
+    app.add_handler(CommandHandler("guildleave", guild_leave_command))
+    app.add_handler(CommandHandler("guild", guild_command))
+    app.add_handler(CommandHandler("guildtop", guild_top_command))
+    app.add_handler(CommandHandler("gear", gear_command))
+    app.add_handler(CommandHandler("gearbuy", gear_buy_command))
+    app.add_handler(CommandHandler("gearequip", gear_equip_command))
+    app.add_handler(CommandHandler("boss", world_boss_command))
+    app.add_handler(CommandHandler("bossattack", world_boss_attack_command))
     app.add_handler(CommandHandler("balance", balance))
     app.add_handler(CommandHandler("rank", rank))
     app.add_handler(CommandHandler("toprank", toprank))
