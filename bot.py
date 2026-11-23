@@ -933,7 +933,6 @@ async def panel(update, context):
 
 async def panel_callback(update, context):
     q = update.callback_query
-    await q.answer()
     chat = q.message.chat
     user = q.from_user
     if OWNER_ID and user.id == OWNER_ID:
@@ -949,6 +948,7 @@ async def panel_callback(update, context):
     if not allowed:
         await q.answer("Group Admin များသာ အသုံးပြုနိုင်ပါတယ်။", show_alert=True)
         return
+    await q.answer()
     action = q.data.split(":", 1)[1]
     if action == "on":
         set_setting(chat.id, "enabled", 1)
