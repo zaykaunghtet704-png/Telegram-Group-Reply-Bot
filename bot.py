@@ -1599,6 +1599,15 @@ async def owner_security_callback(update, context):
     if not handled:
         await update.callback_query.answer()
 
+async def post_shutdown(app):
+    """Return PostgreSQL pool resources cleanly when the service shuts down."""
+    try:
+        from database import close_pool
+        close_pool()
+    except Exception:
+        logger.exception("Could not close PostgreSQL connection pool")
+
+
 async def post_init(app):
     # Keep the Telegram profile identity synchronized with the in-chat persona.
     try:
@@ -1739,7 +1748,7 @@ def main():
     init_coin_codes()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
-    app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    app = Application.builder().token(BOT_TOKEN).concurrent_updates(12).post_init(post_init).post_shutdown(post_shutdown).build()
     app.add_handler(TypeHandler(Update, global_access_guard), group=-20)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(start_menu_callback, pattern=r"^start:"))
