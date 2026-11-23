@@ -268,6 +268,53 @@ async def publish_command(update, context):
     await msg.reply_text(f"📣 Post ဖြန့်ဝေမှု ပြီးပါပြီ။\nအောင်မြင်: {sent}\nမအောင်မြင်: {failed}")
 
 
+async def delete_posts_command(update, context):
+    user, msg = _user(update), update.effective_message
+    if not user or not msg or update.effective_chat.type != "private":
+        if msg:
+            await msg.reply_text("🔒 /lovedeleteposts ကို Private Chat မှာ သုံးပါ။")
+        return
+
+    with connect() as conn:
+        deliveries = conn.execute(
+            "SELECT id,target_chat_id,message_id FROM love_deliveries "
+            "WHERE owner_id=? ORDER BY id DESC",
+            (user.id,),
+        ).fetchall()
+        conn.execute(
+            "UPDATE love_profiles SET active=0,consent_publish=0,updated_at=? WHERE user_id=?",
+            (time.time(), user.id),
+        )
+        conn.execute(
+            "DELETE FROM love_likes WHERE from_user=? OR to_user=?",
+            (user.id, user.id),
+        )
+
+    if not deliveries:
+        await msg.reply_text("🗑️ ဖျက်ရန် ယခင် Post မရှိပါ။ Profile ကို ပိတ်ထားပြီးပါပြီ။")
+        return
+
+    deleted = failed = 0
+    for delivery in deliveries:
+        try:
+            await context.bot.delete_message(
+                chat_id=delivery["target_chat_id"],
+                message_id=delivery["message_id"],
+            )
+            deleted += 1
+            with connect() as conn:
+                conn.execute("DELETE FROM love_deliveries WHERE id=?", (delivery["id"],))
+        except TelegramError:
+            failed += 1
+
+    await msg.reply_text(
+        "🗑️ Relationship Post ဖျက်ခြင်း ပြီးပါပြီ။\\n"
+        f"ဖျက်နိုင်: {deleted} ခု\\n"
+        f"မဖျက်နိုင်: {failed} ခု\\n"
+        "မဖျက်နိုင်သော Post များသည် Bot Permission သို့မဟုတ် Telegram သတ်မှတ်ချက်ကြောင့် ဖြစ်နိုင်ပါသည်။"
+    )
+
+
 async def channel_admin_command(update, context):
     user, msg = _user(update), update.effective_message
     if not user or user.id != OWNER_ID:
@@ -434,12 +481,17 @@ async def love_callback(update, context):
             await q.answer("ကိုယ့် Profile ကို Like မပေးနိုင်ပါ။",show_alert=True)
             return
         with connect() as conn:
-            conn.execute("INSERT INTO love_likes(from_user,to_user,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING",(user.id,target,time.time()))
-            mutual=conn.execute("SELECT 1 FROM love_likes WHERE from_user=? AND to_user=?",(target,user.id)).fetchone()
             blocked=conn.execute("SELECT 1 FROM love_blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)",(user.id,target,target,user.id)).fetchone()
+            profile=conn.execute("SELECT 1 FROM love_profiles WHERE user_id=? AND active=1 AND approved=1 AND consent_publish=1",(target,)).fetchone()
         if blocked:
             await q.answer("ဒီ Profile နဲ့ အပြန်အလှန်ဆက်သွယ်မှု ပိတ်ထားပါတယ်။",show_alert=True)
             return
+        if not profile:
+            await q.answer("ဒီ Profile ကို မတွေ့ပါ သို့မဟုတ် မတက်ကြွတော့ပါ။",show_alert=True)
+            return
+        with connect() as conn:
+            conn.execute("INSERT INTO love_likes(from_user,to_user,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING",(user.id,target,time.time()))
+            mutual=conn.execute("SELECT 1 FROM love_likes WHERE from_user=? AND to_user=?",(target,user.id)).fetchone()
         await q.answer("Like ပေးပြီးပါပြီ ❤️")
         if mutual:
             try:
@@ -451,6 +503,11 @@ async def love_callback(update, context):
     if action=="report":
         with connect() as conn:
             conn.execute("INSERT INTO love_reports(reporter_id,reported_id,reason,created_at) VALUES(?,?,?,?)",(user.id,target,"Reported from profile card",time.time()))
+        with connect() as conn:
+            exists = conn.execute("SELECT 1 FROM love_profiles WHERE user_id=? AND active=1 AND approved=1", (target,)).fetchone()
+        if not exists:
+            await q.answer("ဒီ Profile ကို မတွေ့ပါ။", show_alert=True)
+            return
         await q.answer("Report လက်ခံရရှိပါပြီ။",show_alert=True)
         if OWNER_ID:
             try: await context.bot.send_message(OWNER_ID,f"🚩 Relationship Report\nReporter: {user.id}\nReported: {target}")
@@ -504,6 +561,7 @@ def relationship_handlers():
         conversation,
         CommandHandler("love", love_home),
         CommandHandler("lovepublish", publish_command),
+        CommandHandler("lovedeleteposts", delete_posts_command),
         CommandHandler("lovelove", search_command),
         CommandHandler("lovesearch", search_command),
         CommandHandler("lovechannel", channel_admin_command),
