@@ -236,7 +236,7 @@ async def rpg_ultimate_callback(update, context):
     if not query or not user:
         return
     await query.answer()
-    action = (query.data or "").split(":", 1)[-1]
+    action = (query.data or "").partition(":")[2]
 
     if action == "summon":
         await summon_command(update, context)
@@ -251,7 +251,10 @@ async def rpg_ultimate_callback(update, context):
         await treasure_command(update, context)
         return
 
-    if action in {"a","b","c"}:
+    if action.startswith("treasure:"):
+        chest = action.split(":", 1)[1]
+        if chest not in {"a", "b", "c"}:
+            return
         prize = random.choices([0,500,1200,2500,6000], weights=[18,38,27,14,3], k=1)[0]
         with db() as conn:
             conn.execute("UPDATE game_wallets SET coins=coins+? WHERE user_id=?", (prize,user.id))
