@@ -409,6 +409,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/setmode exact|contains|startswith — Match mode\n"
             "/setchance 0-100 — Reply probability\n"
             "/setcooldown 0-3600 — Per-user cooldown\n"
+            "/setlang my|en|both — Help language\n"
             "/setgroupcooldown 0-3600 — Group cooldown\n"
             "/setflood 0-30 — Flood reply limit\n\n"
             "🛡️ SECURITY & MODERATION\n"
@@ -463,7 +464,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setmode exact|contains|startswith — Keyword စစ်နည်း\n"
         "/setchance 0-100 — Reply ဖြစ်နိုင်ခြေ\n"
         "/setcooldown 0-3600 — User တစ်ယောက်ချင်းစီ စောင့်ချိန်\n"
-        "/setlang my|en|both — ဘာသာစကား\n"
+        "/setlang my|en|both — Help Center ဘာသာစကား\n"
         "/setpriority ID | -100..100 — ဦးစားပေးမှု\n"
         "/setgroupcooldown 0-3600 — Group စောင့်ချိန်\n"
         "/setflood 0-30 — Flood ကာကွယ်မှု\n"
@@ -1299,12 +1300,34 @@ async def post_init(app):
         ("help", "Help and commands"),
         ("panel", "Admin dashboard"),
         ("addreply", "Add keyword reply"),
+        ("editreply", "Edit a saved reply"),
+        ("delreply", "Delete a saved reply"),
         ("listreplies", "List replies"),
+        ("autoreply", "Enable or disable auto replies"),
+        ("setmode", "Set keyword matching mode"),
+        ("setchance", "Set auto reply probability"),
+        ("setcooldown", "Set per-user cooldown"),
+        ("setlang", "Set help language"),
         ("setpriority", "Set reply priority"),
+        ("adultfilter", "Toggle 18+ text filter"),
+        ("warn", "Warn a replied-to member"),
+        ("warns", "Show warning history"),
+        ("resetwarn", "Reset warning history"),
+        ("setwarnlimit", "Set warning threshold"),
+        ("setwarnaction", "Set automatic warning action"),
         ("setflood", "Set flood protection"),
         ("setwelcome", "Toggle welcome messages"),
         ("setgoodbye", "Toggle goodbye messages"),
+        ("setwelcometext", "Customize welcome message"),
+        ("setgoodbyetext", "Customize goodbye message"),
+        ("welcomepreview", "Preview welcome message"),
+        ("goodbyepreview", "Preview goodbye message"),
+        ("resetwelcome", "Reset welcome message"),
+        ("resetgoodbye", "Reset goodbye message"),
         ("setgroupcooldown", "Set group cooldown"),
+        ("replysettings", "Show auto reply settings"),
+        ("stats", "Show group reply statistics"),
+        ("backup", "Owner: download database backup"),
         ("security", "Toggle group security"),
         ("antilink", "Delete unauthorized links"),
         ("antispam", "Delete repeated spam"),
