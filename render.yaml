@@ -11,6 +11,11 @@ services:
         value: "7974865879"
       - key: DATABASE_URL
         sync: false
+      - key: GAME_WEBAPP_URL
+        fromService:
+          type: web
+          name: pro-reply-3d-games
+          property: host
   - type: web
     name: pro-reply-owner-dashboard
     runtime: python
