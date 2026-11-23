@@ -185,7 +185,8 @@ def _account(chat_id, user):
             (user.username or "", _display(user), chat_id, user.id),
         )
         return conn.execute(
-            "SELECT ga.*, gw.coins AS coins FROM game_accounts ga "
+            "SELECT ga.chat_id,ga.user_id,ga.username,ga.display_name,gw.coins AS coins,"
+            "ga.xp,ga.wins,ga.losses,ga.last_daily FROM game_accounts ga "
             "JOIN game_wallets gw ON gw.user_id=ga.user_id "
             "WHERE ga.chat_id=? AND ga.user_id=?",
             (chat_id, user.id),
@@ -810,7 +811,7 @@ async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(_hud_text("🥊 /duel 100 ဖြင့် နှစ်ဦးလောင်းကြေး သတ်မှတ်ပါ။")); return
     _account(update.effective_chat.id,user); _account(update.effective_chat.id,target)
     with db() as conn:
-        row=conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",(update.effective_chat.id,user.id)).fetchone()
+        row=conn.execute("SELECT coins FROM game_wallets WHERE user_id=?",(user.id,)).fetchone()
         if int(row["coins"])<bet:
             await msg.reply_text(_hud_text("❌ သင့် Coin မလုံလောက်ပါ။")); return
         conn.execute("INSERT INTO game_duels(chat_id,challenger_id,opponent_id,challenger_name,opponent_name,created_at,wager) VALUES(?,?,?,?,?,?,?) ON CONFLICT(chat_id) DO UPDATE SET challenger_id=excluded.challenger_id,opponent_id=excluded.opponent_id,challenger_name=excluded.challenger_name,opponent_name=excluded.opponent_name,created_at=excluded.created_at,wager=excluded.wager",(update.effective_chat.id,user.id,target.id,_display(user),_display(target),time.time(),bet))
@@ -823,11 +824,6 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row=conn.execute("SELECT * FROM game_duels WHERE chat_id=?",(chat_id,)).fetchone()
         if not row or float(row["created_at"])<time.time()-300:
             conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
-        conn.execute(
-            "UPDATE game_accounts SET coins=(SELECT coins FROM game_wallets WHERE user_id=game_accounts.user_id) "
-            "WHERE user_id IN (?,?) AND coins<>(SELECT coins FROM game_wallets WHERE user_id=game_accounts.user_id)",
-            (challenger, user.id),
-        )
             await update.effective_message.reply_text(_hud_text("🥊 လက်ခံနိုင်တဲ့ Duel မရှိပါ။")); return
         if int(row["opponent_id"])!=user.id:
             await update.effective_message.reply_text(_hud_text("စိန်ခေါ်ခံရသူသာ လက်ခံနိုင်ပါတယ်။")); return
@@ -841,6 +837,13 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.execute("UPDATE game_wallets SET coins=coins+? WHERE user_id=?",(wager,challenger))
             await update.effective_message.reply_text(_hud_text("❌ သင့် Coin မလုံလောက်ပါ။")); return
         conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
+        for wallet_user_id in (challenger, user.id):
+            wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (wallet_user_id,)).fetchone()
+            if wallet:
+                conn.execute(
+                    "UPDATE game_accounts SET coins=? WHERE user_id=? AND coins<>?",
+                    (int(wallet["coins"]), wallet_user_id, int(wallet["coins"])),
+                )
     winner=random.choice([challenger,user.id]); loser=user.id if winner==challenger else challenger
     winner_name=row["challenger_name"] if winner==challenger else row["opponent_name"]; payout=wager*2
     m=await update.effective_message.reply_text(_hud_text(f"🥊 NEXUS DUEL\n🔴 {row['challenger_name']} VS 🔵 {row['opponent_name']}\nFIGHT!"))
@@ -848,7 +851,7 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with db() as conn:
         conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+30,wins=wins+1 WHERE chat_id=? AND user_id=?",(payout,chat_id,winner))
         conn.execute("UPDATE game_accounts SET xp=xp+10,losses=losses+1 WHERE chat_id=? AND user_id=?",(chat_id,loser))
-        bal=conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,winner)).fetchone()
+        bal=conn.execute("SELECT coins FROM game_wallets WHERE user_id=?",(winner,)).fetchone()
     await m.edit_text(_hud_text(f"🥊 DUEL RESULT\n🏆 Winner: {winner_name}\n💰 +{payout:,} Coin\n⭐ Winner +30 XP / Loser +10 XP\n🪙 Winner Balance: {bal['coins']:,}"))
 
 async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
