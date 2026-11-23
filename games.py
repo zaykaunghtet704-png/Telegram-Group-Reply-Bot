@@ -138,6 +138,20 @@ def _change(chat_id, user, coins=0, xp=0, wins=0, losses=0):
         ).fetchone()
 
 
+def _hud_text(value):
+    """Give every command-game response a consistent text-based 3D arena HUD."""
+    body = str(value)
+    if body.startswith("╔══════════════════════╗"):
+        return body
+    return (
+        "╔══════════════════════════╗\n"
+        "   ⚔️ NEXUS 3D ARENA • SYSTEM\n"
+        "╠══════════════════════════╣\n"
+        + body
+        + "\n╚══════════════════════════╝"
+    )
+
+
 def _level(xp):
     return 1 + int(max(0, xp) // 100)
 
@@ -150,10 +164,10 @@ def _group(update):
 async def _ready(update):
     msg = update.effective_message
     if not _group(update):
-        await msg.reply_text("ဒီဂိမ်းကို Group ထဲမှာပဲ ကစားနိုင်ပါတယ်။")
+        await msg.reply_text(_hud_text("ဒီဂိမ်းကို Group ထဲမှာပဲ ကစားနိုင်ပါတယ်။"))
         return False
     if not games_enabled(update.effective_chat.id):
-        await msg.reply_text("🎮 ဒီ Group မှာ ဂိမ်းစနစ် ပိတ်ထားပါတယ်။ Admin ကို /game on လုပ်ခိုင်းပါ။")
+        await msg.reply_text(_hud_text("🎮 ဒီ Group မှာ ဂိမ်းစနစ် ပိတ်ထားပါတယ်။ Admin ကို /game on လုပ်ခိုင်းပါ။"))
         return False
     return True
 
@@ -182,7 +196,7 @@ async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = context.bot.username
     chat_id = update.effective_chat.id
     launch_url = f"https://t.me/{bot_username}?start=game_{chat_id}"
-    await update.effective_message.reply_text(
+    await update.effective_message.reply_text(_hud_text(
         "🎮 NEXUS 3D GAME HUB\n"
         "━━━━━━━━━━━━━━━━━━\n"
         "3D World ထဲမှာ Character ကို Joystick နဲ့ လှုပ်ရှားပြီး ကစားနိုင်ပါပြီ။\n\n"
@@ -190,7 +204,7 @@ async def game_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🧠 Quiz Battle · 🎰 Lucky Spin\n📚 Quiz Bank: 20,000 Questions\n"
         "🥊 1v1 Duel — Group Member နဲ့ စိန်ခေါ်ကစားရန်\n\n"
         "🪙 Group Coin / Level / XP ကို လက်ရှိ Bot Database နဲ့ ချိတ်ဆက်ထားပါတယ်။\n"
-        "အောက်ကခလုတ်ကိုနှိပ်ပြီး Bot Private Chat ထဲမှာ Game ကိုဖွင့်ပါ။",
+        "အောက်ကခလုတ်ကိုနှိပ်ပြီး Bot Private Chat ထဲမှာ Game ကိုဖွင့်ပါ။"),
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎮 Open 3D Game", url=launch_url)]])
     )
 
@@ -199,11 +213,11 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
         return
     row = _account(update.effective_chat.id, update.effective_user)
-    await update.effective_message.reply_text(
+    await update.effective_message.reply_text(_hud_text(
         f"👤 {row['display_name']}\n🪙 Coin: {row['coins']:,}\n"
         f"⭐ Level: {_level(row['xp'])} | XP: {row['xp']:,}\n"
         f"🏆 အနိုင်: {row['wins']} | ရှုံး: {row['losses']}"
-    )
+    ))
 
 
 async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -215,14 +229,14 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if now - float(row["last_daily"]) < 86400:
         remain = int(86400 - (now - float(row["last_daily"])))
         hours, minutes = divmod(remain // 60, 60)
-        await update.effective_message.reply_text(f"⏳ Daily Reward ပြန်ယူရန် {hours} နာရီ {minutes} မိနစ် စောင့်ပါ။")
+        await update.effective_message.reply_text(_hud_text(f"⏳ Daily Reward ပြန်ယူရန် {hours} နာရီ {minutes} မိနစ် စောင့်ပါ။"))
         return
     with db() as conn:
         conn.execute(
             "UPDATE game_accounts SET coins=coins+?, xp=xp+10, last_daily=? WHERE chat_id=? AND user_id=?",
             (DAILY_COINS, now, chat_id, user.id),
         )
-    await update.effective_message.reply_text(f"🎁 Daily Reward ရပါပြီ။ +{DAILY_COINS} Coin၊ +10 XP")
+    await update.effective_message.reply_text(_hud_text(f"🎁 Daily Reward ရပါပြီ။ +{DAILY_COINS} Coin၊ +10 XP"))
 
 
 async def topcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -235,12 +249,12 @@ async def topcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (update.effective_chat.id,),
         ).fetchall()
     if not rows:
-        await update.effective_message.reply_text("🏆 Leaderboard မရှိသေးပါ။")
+        await update.effective_message.reply_text(_hud_text("🏆 Leaderboard မရှိသေးပါ။"))
         return
     lines = ["🏆 COIN LEADERBOARD — TOP 10"]
     for i, row in enumerate(rows, 1):
         lines.append(f"{i}. {row['display_name']} — 🪙 {row['coins']:,} | Lv.{_level(row['xp'])}")
-    await update.effective_message.reply_text("\n".join(lines))
+    await update.effective_message.reply_text(_hud_text("\n".join(lines)))
 
 
 async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -258,31 +272,31 @@ async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = ["╔══════════════════════╗", "   🧠 3D ARENA • QUIZ", "╚══════════════════════╝", "🎮 PLAYER: " + _display(update.effective_user), "━━━━━━━━━━━━━━━━━━━━", "❓ " + question]
     lines.extend(f"{i}. {option}" for i, option in enumerate(options, 1))
     lines.append("\n/answer 1-4 ဖြေပါ။ ပထမဆုံးမှန်သူ +25 Coin / +10 XP ရမယ်။ (90 စက္ကန့်)")
-    await update.effective_message.reply_text("\n".join(lines))
+    await update.effective_message.reply_text(_hud_text("\n".join(lines)))
 
 
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
         return
     if not context.args or not context.args[0].isdigit() or not 1 <= int(context.args[0]) <= 4:
-        await update.effective_message.reply_text("အသုံးပြုပုံ: /answer 1 (1 မှ 4 အတွင်း)")
+        await update.effective_message.reply_text(_hud_text("အသုံးပြုပုံ: /answer 1 (1 မှ 4 အတွင်း)"))
         return
     chat_id, user = update.effective_chat.id, update.effective_user
     with db() as conn:
         row = conn.execute("SELECT * FROM game_quizzes WHERE chat_id=?", (chat_id,)).fetchone()
         if not row or float(row["expires_at"]) < time.time():
             conn.execute("DELETE FROM game_quizzes WHERE chat_id=?", (chat_id,))
-            await update.effective_message.reply_text("⏰ Quiz မရှိတော့ပါ။ /quiz နဲ့ အသစ်စပါ။")
+            await update.effective_message.reply_text(_hud_text("⏰ Quiz မရှိတော့ပါ။ /quiz နဲ့ အသစ်စပါ။"))
             return
         if int(row["answer"]) != int(context.args[0]):
-            await update.effective_message.reply_text("❌ မမှန်သေးပါဘူး။ ထပ်စမ်းကြည့်ပါ။")
+            await update.effective_message.reply_text(_hud_text("❌ မမှန်သေးပါဘူး။ ထပ်စမ်းကြည့်ပါ။"))
             return
         conn.execute("DELETE FROM game_quizzes WHERE chat_id=?", (chat_id,))
     account = _change(chat_id, user, coins=QUIZ_REWARD, xp=10, wins=1)
-    await update.effective_message.reply_text(
+    await update.effective_message.reply_text(_hud_text(
         f"🎉 {user.full_name} မှန်ပါတယ်။ +{QUIZ_REWARD} Coin / +10 XP\n"
         f"🪙 လက်ကျန်: {account['coins']:,} Coin"
-    )
+    ))
 
 
 async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -291,18 +305,18 @@ async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id, user = update.effective_chat.id, update.effective_user
     wait = _cooldown(chat_id, user.id, "fish", 60)
     if wait:
-        await update.effective_message.reply_text(f"🎣 နောက်တစ်ကြိမ် ငါးဖမ်းရန် {wait} စက္ကန့် စောင့်ပါ။")
+        await update.effective_message.reply_text(_hud_text(f"🎣 နောက်တစ်ကြိမ် ငါးဖမ်းရန် {wait} စက္ကန့် စောင့်ပါ။"))
         return
     chosen = random.choices(FISH, weights=[x[3] for x in FISH], k=1)[0]
     if chosen:
         name, low, high, _ = chosen
         reward = random.randint(low, high)
         row = _change(chat_id, user, coins=reward, xp=5)
-        await update.effective_message.reply_text(
+        await update.effective_message.reply_text(_hud_text(
             f"🎣 {name} ဖမ်းမိပြီ။ +{reward} Coin / +5 XP\n🪙 လက်ကျန် {row['coins']:,}"
-        )
+        ))
     else:
-        await update.effective_message.reply_text("🌊 ဒီတစ်ခေါက် ငါးမမိပါဘူး။ နောက်တစ်ကြိမ် ကြိုးစားပါ။")
+        await update.effective_message.reply_text(_hud_text("🌊 ဒီတစ်ခေါက် ငါးမမိပါဘူး။ နောက်တစ်ကြိမ် ကြိုးစားပါ။"))
 
 
 async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -311,19 +325,19 @@ async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id, user = update.effective_chat.id, update.effective_user
     wait = _cooldown(chat_id, user.id, "hunt", 120)
     if wait:
-        await update.effective_message.reply_text(f"⚔️ နောက်တစ်ကြိမ် Hunt လုပ်ရန် {wait} စက္ကန့် စောင့်ပါ။")
+        await update.effective_message.reply_text(_hud_text(f"⚔️ နောက်တစ်ကြိမ် Hunt လုပ်ရန် {wait} စက္ကန့် စောင့်ပါ။"))
         return
     monster = random.choice(["Goblin", "Wolf", "Shadow Beast", "Dragonling"])
     if random.randint(1, 100) <= 65:
         reward = random.randint(20, 55)
         row = _change(chat_id, user, coins=reward, xp=20, wins=1)
-        await update.effective_message.reply_text(
+        await update.effective_message.reply_text(_hud_text(
             f"⚔️ {monster} ကို အနိုင်ယူလိုက်ပြီ။ +{reward} Coin / +20 XP\n"
             f"🪙 လက်ကျန်: {row['coins']:,} | Level: {_level(row['xp'])}"
-        )
+        ))
     else:
         _change(chat_id, user, xp=5, losses=1)
-        await update.effective_message.reply_text(f"💥 {monster} က အနိုင်ရသွားတယ်။ +5 XP ရပါတယ်။ နောက်တစ်ကြိမ် ကြိုးစားပါ။")
+        await update.effective_message.reply_text(_hud_text(f"💥 {monster} က အနိုင်ရသွားတယ်။ +5 XP ရပါတယ်။ နောက်တစ်ကြိမ် ကြိုးစားပါ။"))
 
 
 async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -333,14 +347,14 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     wait = _cooldown(chat_id, user.id, "spin", 43200)
     if wait:
         hours, mins = divmod(wait // 60, 60)
-        await update.effective_message.reply_text(f"🎰 Spin ပြန်လှည့်ရန် {hours} နာရီ {mins} မိနစ် စောင့်ပါ။")
+        await update.effective_message.reply_text(_hud_text(f"🎰 Spin ပြန်လှည့်ရန် {hours} နာရီ {mins} မိနစ် စောင့်ပါ။"))
         return
     reward = random.choices([0, 10, 25, 50, 100, 200], weights=[20, 25, 25, 18, 10, 2], k=1)[0]
     if reward:
         row = _change(chat_id, user, coins=reward, xp=3)
-        await update.effective_message.reply_text(f"🎰 Lucky Spin! +{reward} Coin ရပါပြီ။\n🪙 လက်ကျန်: {row['coins']:,}")
+        await update.effective_message.reply_text(_hud_text(f"🎰 Lucky Spin! +{reward} Coin ရပါပြီ။\n🪙 လက်ကျန်: {row['coins']:,}"))
     else:
-        await update.effective_message.reply_text("🎰 ဒီတစ်ကြိမ် ဆုမပေါက်ပါဘူး။ နောက်တစ်ကြိမ် ကံစမ်းပါ။")
+        await update.effective_message.reply_text(_hud_text("🎰 ဒီတစ်ကြိမ် ဆုမပေါက်ပါဘူး။ နောက်တစ်ကြိမ် ကံစမ်းပါ။"))
 
 
 async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -349,7 +363,7 @@ async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg, user = update.effective_message, update.effective_user
     target = msg.reply_to_message.from_user if msg.reply_to_message else None
     if not target or target.is_bot or target.id == user.id:
-        await msg.reply_text("🥊 Duel စိန်ခေါ်ရန် ပြိုင်ဘက်ရဲ့ Message ကို Reply လုပ်ပြီး /duel ပို့ပါ။")
+        await msg.reply_text(_hud_text("🥊 Duel စိန်ခေါ်ရန် ပြိုင်ဘက်ရဲ့ Message ကို Reply လုပ်ပြီး /duel ပို့ပါ။"))
         return
     _account(update.effective_chat.id, user)
     _account(update.effective_chat.id, target)
@@ -361,11 +375,11 @@ async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "challenger_name=excluded.challenger_name,opponent_name=excluded.opponent_name,created_at=excluded.created_at",
             (update.effective_chat.id, user.id, target.id, _display(user), _display(target), time.time()),
         )
-    await msg.reply_text(
+    await msg.reply_text(_hud_text(
         f"🥊 {_display(user)} က {_display(target)} ကို Duel စိန်ခေါ်လိုက်ပြီ။\n"
         f"လက်ခံရန် /duelaccept | ငြင်းရန် /dueldecline\n"
         "အနိုင်ရသူ +40 Coin / +20 XP ရမယ်။"
-    )
+    ))
 
 
 async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -376,10 +390,10 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row = conn.execute("SELECT * FROM game_duels WHERE chat_id=?", (chat_id,)).fetchone()
         if not row or float(row["created_at"]) < time.time() - 300:
             conn.execute("DELETE FROM game_duels WHERE chat_id=?", (chat_id,))
-            await update.effective_message.reply_text("🥊 လက်ခံနိုင်တဲ့ Duel မရှိပါ။ /duel နဲ့ စိန်ခေါ်ပါ။")
+            await update.effective_message.reply_text(_hud_text("🥊 လက်ခံနိုင်တဲ့ Duel မရှိပါ။ /duel နဲ့ စိန်ခေါ်ပါ။"))
             return
         if int(row["opponent_id"]) != user.id:
-            await update.effective_message.reply_text("ဒီ Duel ကို စိန်ခေါ်ခံထားရသူသာ လက်ခံနိုင်ပါတယ်။")
+            await update.effective_message.reply_text(_hud_text("ဒီ Duel ကို စိန်ခေါ်ခံထားရသူသာ လက်ခံနိုင်ပါတယ်။"))
             return
         conn.execute("DELETE FROM game_duels WHERE chat_id=?", (chat_id,))
     winner_id = random.choice([int(row["challenger_id"]), int(row["opponent_id"])])
@@ -394,10 +408,10 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?",
             (chat_id, loser_id),
         )
-    await update.effective_message.reply_text(
+    await update.effective_message.reply_text(_hud_text(
         f"🏆 Duel ပြီးဆုံးပါပြီ။\nအနိုင်ရသူ: {winner.full_name}\n"
         f"🎁 ဆု: +{DUEL_REWARD} Coin / +20 XP"
-    )
+    ))
 
 
 async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -407,10 +421,10 @@ async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with db() as conn:
         row = conn.execute("SELECT * FROM game_duels WHERE chat_id=?", (chat_id,)).fetchone()
         if not row or int(row["opponent_id"]) != user.id:
-            await update.effective_message.reply_text("သင့်ကို စိန်ခေါ်ထားတဲ့ Duel မရှိပါ။")
+            await update.effective_message.reply_text(_hud_text("သင့်ကို စိန်ခေါ်ထားတဲ့ Duel မရှိပါ။"))
             return
         conn.execute("DELETE FROM game_duels WHERE chat_id=?", (chat_id,))
-    await update.effective_message.reply_text("🚫 Duel ကို ငြင်းဆိုလိုက်ပါပြီ။")
+    await update.effective_message.reply_text(_hud_text("🚫 Duel ကို ငြင်းဆိုလိုက်ပါပြီ။"))
 
 
 # Only the Bot Owner (OWNER_ID), never group admins, may adjust game coins.
@@ -423,7 +437,7 @@ async def _owner_coin_change(update: Update, context: ContextTypes.DEFAULT_TYPE,
     msg = update.effective_message
     user = update.effective_user
     if not user or user.id != BOT_OWNER_ID:
-        await msg.reply_text("⛔ ဒီလုပ်ဆောင်ချက်ကို Bot Owner သာ အသုံးပြုနိုင်ပါတယ်။")
+        await msg.reply_text(_hud_text("⛔ ဒီလုပ်ဆောင်ချက်ကို Bot Owner သာ အသုံးပြုနိုင်ပါတယ်။"))
         return
     target = msg.reply_to_message.from_user if msg.reply_to_message else None
     if not target and context.args:
@@ -442,30 +456,30 @@ async def _owner_coin_change(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if not target and msg.reply_to_message:
         target = msg.reply_to_message.from_user
     if not target or target.is_bot or target.id == BOT_OWNER_ID:
-        await msg.reply_text(
+        await msg.reply_text(_hud_text(
             "အသုံးပြုပုံ:\n"
             "• Member ရဲ့ Message ကို Reply လုပ်ပြီး /addcoins 500 သို့ /takecoins 500\n"
             "• သို့မဟုတ် /addcoins USER_ID 500"
-        )
+        ))
         return
     if len(context.args) <= amount_index or not context.args[amount_index].isdigit():
-        await msg.reply_text("Coin ပမာဏကို အပေါင်းကိန်းပြည့်နဲ့ ထည့်ပါ။ ဥပမာ: /addcoins 500")
+        await msg.reply_text(_hud_text("Coin ပမာဏကို အပေါင်းကိန်းပြည့်နဲ့ ထည့်ပါ။ ဥပမာ: /addcoins 500"))
         return
     amount = int(context.args[amount_index])
     if amount < 1 or amount > 1_000_000_000:
-        await msg.reply_text("Coin ပမာဏသည် 1 မှ 1,000,000,000 အတွင်း ဖြစ်ရပါမယ်။")
+        await msg.reply_text(_hud_text("Coin ပမာဏသည် 1 မှ 1,000,000,000 အတွင်း ဖြစ်ရပါမယ်။"))
         return
     chat_id = update.effective_chat.id
     account = _account(chat_id, target)
     if direction < 0 and int(account["coins"]) < amount:
-        await msg.reply_text(f"❌ လက်ကျန် Coin မလုံလောက်ပါ။ လက်ကျန်: {account['coins']:,}")
+        await msg.reply_text(_hud_text(f"❌ လက်ကျန် Coin မလုံလောက်ပါ။ လက်ကျန်: {account['coins']:,}"))
         return
     result = _change(chat_id, target, coins=direction * amount)
     verb = "ထည့်ပေးလိုက်ပါပြီ" if direction > 0 else "နှုတ်ယူလိုက်ပါပြီ"
-    await msg.reply_text(
+    await msg.reply_text(_hud_text(
         f"✅ {result['display_name']} ကို {amount:,} Coin {verb}။\n"
         f"🪙 လက်ကျန်: {result['coins']:,} Coin"
-    )
+    ))
 
 
 async def addcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
