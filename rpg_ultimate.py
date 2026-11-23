@@ -36,6 +36,10 @@ def init_rpg_ultimate():
             quantity BIGINT NOT NULL DEFAULT 0,
             PRIMARY KEY(user_id,hero_id)
         )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS rpg_treasure_runs (
+            user_id BIGINT PRIMARY KEY,
+            created_at DOUBLE PRECISION NOT NULL
+        )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS rpg_ultimate_stats (
             user_id BIGINT PRIMARY KEY,
             dungeon_wins BIGINT NOT NULL DEFAULT 0,
@@ -80,10 +84,10 @@ def _bar(value, maximum, length=12):
     return "🟩" * filled + "⬛" * (length - filled)
 
 
-def _dungeon_keyboard():
+def _dungeon_keyboard(user_id):
     return InlineKeyboardMarkup([[
-        InlineKeyboardButton("⚔️ ATTACK", callback_data="rpgx:attack"),
-        InlineKeyboardButton("🏃 Retreat", callback_data="rpgx:retreat"),
+        InlineKeyboardButton("⚔️ ATTACK", callback_data=f"rpgx:attack:{user_id}"),
+        InlineKeyboardButton("🏃 Retreat", callback_data=f"rpgx:retreat:{user_id}"),
     ]])
 
 
@@ -99,7 +103,7 @@ async def dungeon_command(update, context):
                 f"👹 {active['enemy_name']} • HP {int(active['enemy_hp']):,}\n"
                 f"❤️ Your HP: {int(active['player_hp']):,}\n"
                 "တိုက်ခိုက်မှု ဆက်လုပ်ပါ။",
-                reply_markup=_dungeon_keyboard(),
+                reply_markup=_dungeon_keyboard(user.id),
             )
             return
         coins = _wallet(conn, user.id)
@@ -213,6 +217,10 @@ async def treasure_command(update, context):
         conn.execute("UPDATE game_wallets SET coins=coins-? WHERE user_id=? AND coins>=?", (fee,user.id,fee))
         _sync_legacy(conn, user.id, coins-fee)
         conn.execute(
+            "INSERT INTO rpg_treasure_runs(user_id,created_at) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET created_at=EXCLUDED.created_at",
+            (user.id,time.time()),
+        )
+        conn.execute(
             """INSERT INTO rpg_ultimate_stats(user_id,treasure_runs) VALUES(?,1)
                ON CONFLICT(user_id) DO UPDATE SET treasure_runs=rpg_ultimate_stats.treasure_runs+1""",
             (user.id,),
@@ -223,9 +231,9 @@ async def treasure_command(update, context):
         "တစ်လုံးထဲမှာ ရတနာကြီးရှိတယ်။ တစ်လုံးမှာ ထောင်ချောက်ရှိနိုင်တယ်။\n"
         "ဘယ်သေတ္တာကို ဖွင့်မလဲ?",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("📦 A", callback_data="rpgx:treasure:a"),
-            InlineKeyboardButton("🎁 B", callback_data="rpgx:treasure:b"),
-            InlineKeyboardButton("💎 C", callback_data="rpgx:treasure:c"),
+            InlineKeyboardButton("📦 A", callback_data=f"rpgx:treasure:{user.id}:a"),
+            InlineKeyboardButton("🎁 B", callback_data=f"rpgx:treasure:{user.id}:b"),
+            InlineKeyboardButton("💎 C", callback_data=f"rpgx:treasure:{user.id}:c"),
         ]]),
     )
 
@@ -237,8 +245,10 @@ async def rpg_ultimate_callback(update, context):
         return
     await query.answer()
     action = (query.data or "").partition(":")[2]
+    parts = action.split(":")
+    action_name = parts[0]
 
-    if action == "menu":
+    if action_name == "menu":
         await query.edit_message_text(
             "🌌╭━━ MYAE ULTIMATE RPG ━━╮\\n"
             "⚔️ Dungeon Raid • 🌟 Hero Summon\\n"
@@ -254,22 +264,34 @@ async def rpg_ultimate_callback(update, context):
             ]),
         )
         return
-    if action == "summon":
+    if action_name == "summon":
         await summon_command(update, context)
         return
-    if action == "heroes":
+    if action_name == "heroes":
         await heroes_command(update, context)
         return
-    if action == "dungeon":
+    if action_name == "dungeon":
         await dungeon_command(update, context)
         return
-    if action == "treasure":
+    if action_name == "treasure":
         await treasure_command(update, context)
         return
 
-    if action.startswith("treasure:"):
-        chest = action.split(":", 1)[1]
-        if chest not in {"a", "b", "c"}:
+    if action_name == "treasure" and len(parts) == 3:
+        try:
+            owner_id = int(parts[1])
+        except ValueError:
+            return
+        chest = parts[2]
+        if owner_id != user.id or chest not in {"a", "b", "c"}:
+            return
+        with db() as conn:
+            consumed = conn.execute(
+                "DELETE FROM rpg_treasure_runs WHERE user_id=? AND created_at>=? RETURNING user_id",
+                (user.id, time.time()-600),
+            ).fetchone()
+        if not consumed:
+            await query.edit_message_text("⌛ ဒီ Treasure ရွေးချယ်မှုကို အသုံးပြုပြီးပါပြီ သို့မဟုတ် သက်တမ်းကုန်သွားပါပြီ။")
             return
         prize = random.choices([0,500,1200,2500,6000], weights=[18,38,27,14,3], k=1)[0]
         with db() as conn:
@@ -280,7 +302,7 @@ async def rpg_ultimate_callback(update, context):
             _add_progress(conn,user.id,8,prize>0)
         result = "🪤 ထောင်ချောက်မိသွားတယ်။" if prize == 0 else f"💎 ရတနာတွေ့ပြီ! +{prize:,} Coin"
         await query.edit_message_text(
-            f"🗺️ TREASURE RESULT\n📦 Chest {action.upper()}\n{result}\n🪙 Balance: {balance:,} Coin\n✨ +8 RPG XP",
+            f"🗺️ TREASURE RESULT\n📦 Chest {chest.upper()}\n{result}\n🪙 Balance: {balance:,} Coin\n✨ +8 RPG XP",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔁 ထပ်ရှာမယ်", callback_data="rpgx:treasure"),
                 InlineKeyboardButton("🏠 RPG Menu", callback_data="rpg:profile"),
@@ -288,13 +310,17 @@ async def rpg_ultimate_callback(update, context):
         )
         return
 
-    if action == "retreat":
+    if action_name == "retreat" and len(parts) == 2 and parts[1].isdigit():
+        if int(parts[1]) != user.id:
+            return
         with db() as conn:
             conn.execute("DELETE FROM rpg_ultimate_runs WHERE user_id=?", (user.id,))
         await query.edit_message_text("🏃 Dungeon မှ ဆုတ်ခွာပြီးပါပြီ။ Entry fee ပြန်မရပါ။")
         return
 
-    if action == "attack":
+    if action_name == "attack" and len(parts) == 2 and parts[1].isdigit():
+        if int(parts[1]) != user.id:
+            return
         with db() as conn:
             run = conn.execute("SELECT * FROM rpg_ultimate_runs WHERE user_id=?", (user.id,)).fetchone()
             if not run:
@@ -353,7 +379,7 @@ async def rpg_ultimate_callback(update, context):
                     f"💀 Enemy HP [{_bar(remaining_enemy,int(run['enemy_hp']))}] {remaining_enemy:,}\n"
                     f"🩸 Counter Attack: -{counter} HP"
                 )
-                keyboard = _dungeon_keyboard()
+                keyboard = _dungeon_keyboard(user.id)
         await query.edit_message_text("🏰 MYAE DUNGEON RAID\n━━━━━━━━━━━━━━━━━━━━\n"+result, reply_markup=keyboard)
 
 
