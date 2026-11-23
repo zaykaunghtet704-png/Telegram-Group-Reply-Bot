@@ -604,7 +604,7 @@ async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 MINES_MULTIPLIERS = [1.08, 1.23, 1.42, 1.64, 1.92, 2.26, 2.68, 3.21, 3.90, 4.80]
 
 
-MINES_MULTIPLIERS = [1.25, 1.60, 2.10, 2.85, 3.95, 5.60, 8.20, 12.5, 20.0, 35.0]
+MINES_MULTIPLIERS = [1.08, 1.23, 1.42, 1.64, 1.92, 2.25, 2.68, 3.21, 3.90, 4.80]
 
 
 def _mine_keyboard(user_id, opened):
