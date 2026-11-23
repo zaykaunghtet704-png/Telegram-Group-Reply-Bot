@@ -91,7 +91,7 @@ def init_games():
         """)
         # Keep legacy game_accounts coin columns synchronized for older game logic.
         conn.execute("""CREATE OR REPLACE FUNCTION sync_game_wallet_from_account()
-            RETURNS trigger AS $
+            RETURNS trigger AS $wallet_sync$
             BEGIN
                 INSERT INTO game_wallets(user_id, coins)
                 VALUES (NEW.user_id, NEW.coins)
@@ -102,7 +102,7 @@ def init_games():
                    AND (chat_id<>NEW.chat_id OR coins<>NEW.coins);
                 RETURN NEW;
             END;
-            $ LANGUAGE plpgsql
+            $wallet_sync$ LANGUAGE plpgsql
         """)
         conn.execute("DROP TRIGGER IF EXISTS game_accounts_wallet_sync ON game_accounts")
         conn.execute("""CREATE TRIGGER game_accounts_wallet_sync
