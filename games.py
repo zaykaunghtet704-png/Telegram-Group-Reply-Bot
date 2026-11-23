@@ -238,17 +238,23 @@ def _change(chat_id, user, coins=0, xp=0, wins=0, losses=0):
 
 
 def _hud_text(value):
-    """Give every command-game response a consistent text-based 3D arena HUD."""
-    body = str(value)
-    if body.startswith("╔══════════════════════╗"):
+    """Render command replies as compact faux-3D game panels for Telegram chat."""
+    body = str(value).strip()
+    if body.startswith("╭━━━ 💠 MYAE 3D"):
         return body
-    return (
-        "╔══════════════════════════╗\n"
-        "   ⚔️ NEXUS 3D ARENA • SYSTEM\n"
-        "╠══════════════════════════╣\n"
-        + body
-        + "\n╚══════════════════════════╝"
-    )
+
+    # Telegram messages cannot render real-time 3D models. Layered borders,
+    # depth shadows, status rails and game glyphs give commands a 3D-like HUD.
+    lines = body.splitlines() or ["⚔️ ARENA READY"]
+    title = lines[0][:34]
+    details = lines[1:]
+    top = "╭━━━ 💠 MYAE 3D ARENA ━━━╮"
+    header = f"┃  ✦ {title}"
+    divider = "┣━━━━━━━━━━━━━━━━━━━━━━┫"
+    footer = "╰━━━━━━━━━━━━━━━━━━━━━━╯"
+    depth = "   ▰ ▰ ▰  ✧  NEXUS SYSTEM"
+    content = "\\n".join(f"┃  {line}" if line else "┃" for line in details)
+    return "\\n".join([top, header, divider, content, footer, depth])
 
 
 async def _animate_hud(message, frames, delay=0.12):
