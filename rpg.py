@@ -2,7 +2,7 @@
 import logging
 import random
 import time
-from datetime import date, timedelta
+from datetime import date
 
 from database import connect as db
 
@@ -318,28 +318,25 @@ async def rpg_daily_command(update, context):
         return
     today = date.today()
     with db() as conn:
-        previous = conn.execute(
-            "SELECT last_claim,streak FROM rpg_daily_claims WHERE user_id=?",
-            (user.id,),
+        claim = conn.execute(
+            """INSERT INTO rpg_daily_claims(user_id,last_claim,streak) VALUES(?,?,1)
+               ON CONFLICT(user_id) DO UPDATE SET
+               streak=CASE
+                   WHEN rpg_daily_claims.last_claim=EXCLUDED.last_claim - 1
+                   THEN rpg_daily_claims.streak+1 ELSE 1 END,
+               last_claim=EXCLUDED.last_claim
+               WHERE rpg_daily_claims.last_claim < EXCLUDED.last_claim
+               RETURNING streak""",
+            (user.id, today),
         ).fetchone()
-        if previous and previous["last_claim"] == today:
+        if not claim:
             await update.effective_message.reply_text(
                 "⏳ ဒီနေ့ RPG Daily Reward ကို ယူပြီးပါပြီ။ မနက်ဖြန် ပြန်လာခဲ့နော်။"
             )
             return
-        streak = (
-            int(previous["streak"]) + 1
-            if previous and previous["last_claim"] == today - timedelta(days=1)
-            else 1
-        )
+        streak = int(claim["streak"])
         coins = min(1000, 200 + (streak - 1) * 50)
         xp = min(50, 20 + (streak - 1) * 5)
-        conn.execute(
-            """INSERT INTO rpg_daily_claims(user_id,last_claim,streak) VALUES(?,?,?)
-               ON CONFLICT(user_id) DO UPDATE SET
-               last_claim=EXCLUDED.last_claim,streak=EXCLUDED.streak""",
-            (user.id, today, streak),
-        )
         conn.execute(
             "INSERT INTO game_wallets(user_id,coins) VALUES(?,100) ON CONFLICT(user_id) DO NOTHING",
             (user.id,),
