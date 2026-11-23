@@ -1611,19 +1611,22 @@ async def post_shutdown(app):
 
 
 async def post_init(app):
-    # Keep the Telegram profile identity synchronized with the in-chat persona.
-    try:
-        await app.bot.set_my_name("မြအေး")
-        await app.bot.set_my_description(
-            "မြအေးပါ 💗 Group ထဲမှာ စကားပြောနိုင်ပြီး Coin စနစ်နဲ့ Quiz, Spin, Fish, Hunt, Mines, Duel ဂိမ်းတွေ ဆော့နိုင်ပါတယ်။"
-        )
-        await app.bot.set_my_short_description(
-            "မြအေးနဲ့ စကားပြောမယ်၊ Coin နဲ့ ဂိမ်းတွေဆော့မယ် 💗"
-        )
-    except TelegramError:
-        logger.exception("Could not update Telegram bot profile name/description")
+    # Profile changes are optional: Telegram may rate-limit these API calls.
+    # Set SYNC_BOT_PROFILE=1 only when an intentional profile update is needed.
+    if os.getenv("SYNC_BOT_PROFILE", "0").strip().lower() in {"1", "true", "yes", "on"}:
+        try:
+            await app.bot.set_my_name("မြအေး")
+            await app.bot.set_my_description(
+                "မြအေးပါ 💗 Group ထဲမှာ စကားပြောနိုင်ပြီး Coin စနစ်နဲ့ Quiz, Spin, Fish, Hunt, Mines, Duel ဂိမ်းတွေ ဆော့နိုင်ပါတယ်။"
+            )
+            await app.bot.set_my_short_description(
+                "မြအေးနဲ့ စကားပြောမယ်၊ Coin နဲ့ ဂိမ်းတွေဆော့မယ် 💗"
+            )
+        except TelegramError as exc:
+            logger.warning("Telegram profile sync skipped; bot startup will continue: %s", exc)
 
-    await app.bot.set_my_commands([
+    try:
+        await app.bot.set_my_commands([
         ("start", "Start bot"),
         ("owner", "Bot Owner control center"),
         ("ownerban", "Owner: block a user from using the bot"),
@@ -1725,7 +1728,10 @@ async def post_init(app):
         ("rules", "Show group rules"),
         ("lock", "Admin: lock group messages"),
         ("unlock", "Admin: unlock group messages"),
-    ])
+        ])
+    except TelegramError as exc:
+        logger.warning("Telegram command registration skipped; bot startup will continue: %s", exc)
+
     if OWNER_ID:
         app.job_queue.run_repeating(
             automatic_backup,
