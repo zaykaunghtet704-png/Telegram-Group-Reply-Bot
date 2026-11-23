@@ -360,145 +360,102 @@ async def topcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _ready(update):
-        return
-    chat_id = update.effective_chat.id
-    question, options, answer = random.choice(QUIZZES)
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO game_quizzes(chat_id,question,options,answer,expires_at) VALUES(?,?,?,?,?) "
-            "ON CONFLICT(chat_id) DO UPDATE SET question=excluded.question,options=excluded.options,"
-            "answer=excluded.answer,expires_at=excluded.expires_at",
-            (chat_id, question, json.dumps(options, ensure_ascii=False), answer, time.time() + 90),
-        )
-    msg = await update.effective_message.reply_text(_hud_text(
-        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n"
-        "🎮 စိန်ခေါ်မှုတစ်ခု ပြင်ဆင်နေသည်...\n⚡ READY?"
-    ))
-    await _animate_hud(msg, [
-        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n🔍 မေးခွန်းရှာဖွေနေသည်...\n▰▱▱",
-        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n🎯 အဖြေရွေးချယ်စရာများ ပြင်ဆင်နေသည်...\n▰▰▱",
-        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n🚀 QUIZ START!\n▰▰▰",
-    ], 0.45)
-    lines = ["╔══════════════════════╗", "   🧠 3D ARENA • QUIZ", "╚══════════════════════╝", "🎮 PLAYER: " + _display(update.effective_user), "━━━━━━━━━━━━━━━━━━━━", "❓ " + question]
-    lines.extend(f"{i}. {option}" for i, option in enumerate(options, 1))
-    lines.append("\n/answer 1-4 ဖြေပါ။ ပထမဆုံးမှန်သူ +25 Coin / +10 XP ရမယ်။ (90 စက္ကန့်)")
+    if not await _ready(update): return
+    chat_id,user=update.effective_chat.id,update.effective_user
+    bet=_valid_bet(context)
+    if bet is None:
+        await update.effective_message.reply_text(_hud_text("🧠 /quiz 100 ဖြင့် Coin လောင်းပြီး Quiz ဝင်ပါ။ အနည်းဆုံး 10 Coin။")); return
+    with db() as conn: active=conn.execute("SELECT * FROM game_quizzes WHERE chat_id=?",(chat_id,)).fetchone()
+    if active and float(active["expires_at"])<time.time(): _expire_quiz(chat_id); active=None
+    if active:
+        with db() as conn: joined=conn.execute("SELECT bet FROM game_quiz_players WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
+        if joined:
+            await update.effective_message.reply_text(_hud_text(f"Quiz ထဲဝင်ပြီးသား။ Bet {int(joined['bet']):,} Coin။ /answer 1-4")); return
+    else:
+        q,opts,ans=random.choice(QUIZZES)
+        with db() as conn:
+            conn.execute("INSERT INTO game_quizzes(chat_id,question,options,answer,expires_at) VALUES(?,?,?,?,?) ON CONFLICT(chat_id) DO UPDATE SET question=excluded.question,options=excluded.options,answer=excluded.answer,expires_at=excluded.expires_at",(chat_id,q,json.dumps(opts,ensure_ascii=False),ans,time.time()+90))
+        active={"question":q,"options":json.dumps(opts,ensure_ascii=False)}
+    if _stake(chat_id,user,bet) is None:
+        with db() as conn: bal=conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
+        await update.effective_message.reply_text(_hud_text(f"❌ Coin မလုံလောက်ပါ။ လက်ကျန် {int(bal['coins']):,}")); return
+    with db() as conn: conn.execute("INSERT INTO game_quiz_players(chat_id,user_id,bet,joined_at) VALUES(?,?,?,?)",(chat_id,user.id,bet,time.time()))
+    msg=await update.effective_message.reply_text(_hud_text("🧠 QUIZ ARENA\n🔍 မေးခွန်း Load လုပ်နေသည်..."))
+    await _animate_hud(msg,["🧠 QUIZ ARENA\n🎯 Bet အတည်ပြုနေသည်...\n▰▱▱","🧠 QUIZ ARENA\n🚀 CHALLENGE START!\n▰▰▰"],0.35)
+    lines=["🧠 NEXUS QUIZ ARENA","━━━━━━━━━━━━━━━━━━","❓ "+active["question"]]
+    lines.extend(f"{i}. {x}" for i,x in enumerate(json.loads(active["options"]),1))
+    lines.append("\nဝင်ကစားသူများ /quiz BET ဖြင့်ဝင်ပါ။\n/answer 1-4 ဖြေပါ။")
     await msg.edit_text(_hud_text("\n".join(lines)))
 
-
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _ready(update):
-        return
-    if not context.args or not context.args[0].isdigit() or not 1 <= int(context.args[0]) <= 4:
-        await update.effective_message.reply_text(_hud_text("အသုံးပြုပုံ: /answer 1 (1 မှ 4 အတွင်း)"))
-        return
-    chat_id, user = update.effective_chat.id, update.effective_user
+    if not await _ready(update): return
+    if not context.args or not context.args[0].isdigit() or not 1<=int(context.args[0])<=4:
+        await update.effective_message.reply_text(_hud_text("အသုံးပြုပုံ: /answer 1")); return
+    chat_id,user=update.effective_chat.id,update.effective_user
     with db() as conn:
-        row = conn.execute("SELECT * FROM game_quizzes WHERE chat_id=?", (chat_id,)).fetchone()
-        if not row or float(row["expires_at"]) < time.time():
-            conn.execute("DELETE FROM game_quizzes WHERE chat_id=?", (chat_id,))
-            await update.effective_message.reply_text(_hud_text("⏰ Quiz မရှိတော့ပါ။ /quiz နဲ့ အသစ်စပါ။"))
-            return
-        if int(row["answer"]) != int(context.args[0]):
-            msg = await update.effective_message.reply_text(_hud_text(
-                "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n"
-                "🔎 အဖြေစစ်ဆေးနေသည်...\n⏳ PLEASE WAIT"
-            ))
-            await _animate_hud(msg, [
-                "🧠 QUIZ CHECKER\n━━━━━━━━━━━━━━━━━━\n🔍 အဖြေကို စစ်ဆေးနေသည်...\n▰▱▱",
-                "🧠 QUIZ CHECKER\n━━━━━━━━━━━━━━━━━━\n⚠️ အဖြေမကိုက်ညီပါ...\n▰▰▱",
-                "🧠 QUIZ RESULT\n━━━━━━━━━━━━━━━━━━\n❌ WRONG ANSWER\nထပ်ကြိုးစားကြည့်ပါ!",
-            ], 0.35)
-            return
-        conn.execute("DELETE FROM game_quizzes WHERE chat_id=?", (chat_id,))
-    msg = await update.effective_message.reply_text(_hud_text(
-        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n"
-        "🔎 အဖြေစစ်ဆေးနေသည်...\n⚡ SCANNING"
-    ))
-    await _animate_hud(msg, [
-        "🧠 QUIZ CHECKER\n━━━━━━━━━━━━━━━━━━\n🔍 အဖြေကို စစ်ဆေးနေသည်...\n▰▱▱",
-        "🧠 QUIZ CHECKER\n━━━━━━━━━━━━━━━━━━\n✅ အဖြေမှန်ကြောင်း တွေ့ရှိ!\n▰▰▱",
-        "🧠 QUIZ REWARD\n━━━━━━━━━━━━━━━━━━\n🎉 VICTORY UNLOCKED!\n▰▰▰",
-    ], 0.4)
-    account = _change(chat_id, user, coins=QUIZ_REWARD, xp=10, wins=1)
-    await msg.edit_text(_hud_text(
-        "🧠 NEXUS QUIZ ARENA • RESULT\n━━━━━━━━━━━━━━━━━━\n"
-        f"🏆 {user.full_name} မှန်ပါတယ်။\n"
-        f"🎁 +{QUIZ_REWARD} Coin / +10 XP\n"
-        f"🪙 လက်ကျန်: {account['coins']:,} Coin"
-    ))
+        q=conn.execute("SELECT * FROM game_quizzes WHERE chat_id=?",(chat_id,)).fetchone()
+        player=conn.execute("SELECT bet FROM game_quiz_players WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
+    if not q or float(q["expires_at"])<time.time():
+        if q: _expire_quiz(chat_id)
+        await update.effective_message.reply_text(_hud_text("⏰ Quiz ပြီးဆုံးသွားပါပြီ။ /quiz BET ဖြင့်ပြန်စပါ။")); return
+    if not player:
+        await update.effective_message.reply_text(_hud_text("ဒီ Quiz မှာမဝင်ရသေးပါ။ /quiz 100 ဖြင့်ဝင်ပါ။")); return
+    if int(q["answer"])!=int(context.args[0]):
+        m=await update.effective_message.reply_text(_hud_text("🧠 QUIZ CHECKER\nအဖြေစစ်ဆေးနေသည်..."))
+        await _animate_hud(m,["❌ WRONG ANSWER\nထပ်ကြိုးစားပါ!"],0.3); return
+    with db() as conn:
+        players=conn.execute("SELECT user_id FROM game_quiz_players WHERE chat_id=?",(chat_id,)).fetchall()
+        conn.execute("DELETE FROM game_quiz_players WHERE chat_id=?",(chat_id,))
+        conn.execute("DELETE FROM game_quizzes WHERE chat_id=?",(chat_id,))
+        for p in players:
+            if int(p["user_id"])!=user.id: conn.execute("UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?",(chat_id,int(p["user_id"])))
+        payout=int(player["bet"])*2
+        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+25,wins=wins+1 WHERE chat_id=? AND user_id=?",(payout,chat_id,user.id))
+        row=conn.execute("SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
+    m=await update.effective_message.reply_text(_hud_text("🧠 QUIZ RESULT\n🏆 Winner detected..."))
+    await _animate_hud(m,["🔓 REWARD UNLOCKED!","🎉 CORRECT ANSWER!"],0.35)
+    await m.edit_text(_hud_text(f"🏆 {user.full_name} အနိုင်ရ!\n🎁 {int(player['bet']):,} × 2 = +{payout:,} Coin\n⭐ +25 XP\n🪙 လက်ကျန် {row['coins']:,}"))
 
 async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _ready(update):
-        return
-    chat_id, user = update.effective_chat.id, update.effective_user
-    wait = _cooldown(chat_id, user.id, "fish", 60)
+    if not await _ready(update): return
+    chat_id,user=update.effective_chat.id,update.effective_user
+    bet=_valid_bet(context)
+    if bet is None:
+        await update.effective_message.reply_text(_hud_text("🎣 /fish 100 ဖြင့် လောင်းကြေးထည့်ပါ။ အနည်းဆုံး 10 Coin။")); return
+    wait=_cooldown(chat_id,user.id,"fish",60)
     if wait:
-        await update.effective_message.reply_text(_hud_text(f"🎣 နောက်တစ်ကြိမ် ငါးဖမ်းရန် {wait} စက္ကန့် စောင့်ပါ။"))
-        return
-    chosen = random.choices(FISH, weights=[x[3] for x in FISH], k=1)[0]
-    msg = await update.effective_message.reply_text(_hud_text(
-        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n"
-        "🌊 ရေကန်ထဲ ငါးမျှားချိတ်ချလိုက်ပြီ...\n🎣 ────────"
-    ))
-    await _animate_hud(msg, [
-        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n🌊 ရေပြင်ငြိမ်သက်နေသည်...\n🎣 ────────",
-        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n🐟 တစ်ခုခု ချိတ်မိနေပြီ!\n〰️〰️〰️",
-        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n‼️ ငါးက ဆွဲနေပြီ!\n💦 SPLASH!",
-        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n⬆️ ငါးကို ဆွဲတင်နေသည်...\n🎣 ⬆️",
-    ], 0.55)
-    name, low, high, _ = chosen
-    reward = random.randint(low, high)
-    row = _change(chat_id, user, coins=reward, xp=5)
-    await msg.edit_text(_hud_text(
-        "🎣 NEXUS FISHING • CATCH RESULT\n━━━━━━━━━━━━━━━━━━\n"
-        f"🐠 ဖမ်းမိသောငါး: {name}\n"
-        f"🎁 ဆု: +{reward} Coin / +5 XP\n"
-        f"🪙 လက်ကျန်: {row['coins']:,} Coin\n"
-        "🏆 NICE CATCH!"
-    ))
-
+        await update.effective_message.reply_text(_hud_text(f"⏳ {wait} စက္ကန့်စောင့်ပါ။")); return
+    if _stake(chat_id,user,bet) is None:
+        await update.effective_message.reply_text(_hud_text("❌ Coin မလုံလောက်ပါ။ /balance စစ်ပါ။")); return
+    name,_,_,_=random.choices(FISH,weights=[x[3] for x in FISH],k=1)[0]
+    mult={"ငါးသေး":0.5,"ငါးကြင်း":1.2,"ငါးကြီး":2.0,"ရွှေငါး":5.0}.get(name,0.5)
+    payout=int(bet*mult); won=payout>bet
+    m=await update.effective_message.reply_text(_hud_text("🎣 NEXUS FISHING ZONE\n🌊 ငါးမျှားချိတ်ချလိုက်ပြီ..."))
+    await _animate_hud(m,["🌊 ရေပြင်လှုပ်ရှားနေသည်...","🐟 ငါးချိတ်မိပြီ! 💦 SPLASH!","⬆️ ငါးကိုဆွဲတင်နေသည်..."],0.5)
+    with db() as conn:
+        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+?,wins=wins+?,losses=losses+? WHERE chat_id=? AND user_id=?",(payout,5 if won else 3,1 if won else 0,0 if won else 1,chat_id,user.id))
+        row=conn.execute("SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
+    await m.edit_text(_hud_text(f"🎣 FISHING RESULT • {'🏆 WIN' if won else '💥 LOSS'}\n🐠 {name} | {mult:g}x\n🎯 Bet: {bet:,}\n💰 ပြန်ရငွေ: {payout:,} Coin\n⭐ XP +{5 if won else 3}\n🪙 လက်ကျန်: {row['coins']:,}"))
 
 async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _ready(update):
-        return
-    chat_id, user = update.effective_chat.id, update.effective_user
-    wait = _cooldown(chat_id, user.id, "hunt", 120)
+    if not await _ready(update): return
+    chat_id,user=update.effective_chat.id,update.effective_user
+    bet=_valid_bet(context)
+    if bet is None:
+        await update.effective_message.reply_text(_hud_text("⚔️ /hunt 100 ဖြင့် လောင်းကြေးထည့်ပါ။ အနည်းဆုံး 10 Coin။")); return
+    wait=_cooldown(chat_id,user.id,"hunt",120)
     if wait:
-        await update.effective_message.reply_text(_hud_text(f"⚔️ နောက်တစ်ကြိမ် Hunt လုပ်ရန် {wait} စက္ကန့် စောင့်ပါ။"))
-        return
-    monster = random.choice(["Goblin", "Wolf", "Shadow Beast", "Dragonling"])
-    won = random.randint(1, 100) <= 65
-    msg = await update.effective_message.reply_text(_hud_text(
-        "⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n"
-        f"👹 ENEMY: {monster}\n🛡️ PLAYER: {user.full_name}\n"
-        "⚡ BATTLE START!"
-    ))
-    await _animate_hud(msg, [
-        f"⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n👹 {monster} ပေါ်လာပြီ!\n🛡️ DEFEND!",
-        f"⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n🗡️ PLAYER ATTACK!\n💥 တိုက်ခိုက်နေသည်...",
-        f"⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n👹 {monster} ပြန်တိုက်လာပြီ!\n⚡ CLASH!",
-        f"⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n🎯 နောက်ဆုံးတိုက်ချက်!\n🔥 FINISH MOVE!",
-    ], 0.6)
-    if won:
-        reward = random.randint(20, 55)
-        row = _change(chat_id, user, coins=reward, xp=20, wins=1)
-        result = (
-            f"🏆 VICTORY! {monster} ကို အနိုင်ယူလိုက်ပြီ။\n"
-            f"🎁 +{reward} Coin / +20 XP\n"
-            f"🪙 လက်ကျန်: {row['coins']:,} | Level: {_level(row['xp'])}"
-        )
-    else:
-        row = _change(chat_id, user, xp=5, losses=1)
-        result = (
-            f"💥 DEFEAT! {monster} က အနိုင်ရသွားတယ်။\n"
-            f"⭐ +5 XP ရပါတယ်။\n🪙 လက်ကျန်: {row['coins']:,} Coin"
-        )
-    await msg.edit_text(_hud_text(
-        "⚔️ NEXUS MONSTER HUNT • RESULT\n━━━━━━━━━━━━━━━━━━\n"
-        f"👹 ENEMY: {monster}\n{result}"
-    ))
-
+        await update.effective_message.reply_text(_hud_text(f"⏳ {wait} စက္ကန့်စောင့်ပါ။")); return
+    if _stake(chat_id,user,bet) is None:
+        await update.effective_message.reply_text(_hud_text("❌ Coin မလုံလောက်ပါ။ /balance စစ်ပါ။")); return
+    monster=random.choice(["Goblin","Wolf","Shadow Beast","Dragonling"])
+    won=random.randint(1,100)<=60; payout=bet*2 if won else 0
+    m=await update.effective_message.reply_text(_hud_text(f"⚔️ MONSTER HUNT\n👹 {monster}\n⚡ BATTLE START!"))
+    await _animate_hud(m,[f"👹 {monster} ပေါ်လာပြီ!\n🛡️ DEFEND!","🗡️ PLAYER ATTACK!\n💥 CLASH!","🔥 FINAL STRIKE!\n⚡ FINISH MOVE!"],0.55)
+    with db() as conn:
+        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+?,wins=wins+?,losses=losses+? WHERE chat_id=? AND user_id=?",(payout,20 if won else 5,1 if won else 0,0 if won else 1,chat_id,user.id))
+        row=conn.execute("SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
+    await m.edit_text(_hud_text(f"⚔️ HUNT RESULT • {'🏆 VICTORY' if won else '💥 DEFEAT'}\n👹 {monster}\n{'💰 Payout: '+format(payout,',')+' Coin (2x)' if won else '📉 Bet lost: '+format(bet,',')+' Coin'}\n⭐ XP +{20 if won else 5}\n🪙 Balance: {row['coins']:,}"))
 
 async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
@@ -617,82 +574,51 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ))
 
 async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _ready(update):
-        return
-    msg, user = update.effective_message, update.effective_user
-    target = msg.reply_to_message.from_user if msg.reply_to_message else None
-    if not target or target.is_bot or target.id == user.id:
-        await msg.reply_text(_hud_text("🥊 Duel စိန်ခေါ်ရန် ပြိုင်ဘက်ရဲ့ Message ကို Reply လုပ်ပြီး /duel ပို့ပါ။"))
-        return
-    _account(update.effective_chat.id, user)
-    _account(update.effective_chat.id, target)
+    if not await _ready(update): return
+    msg,user=update.effective_message,update.effective_user
+    target=msg.reply_to_message.from_user if msg.reply_to_message else None
+    bet=_valid_bet(context)
+    if not target or target.is_bot or target.id==user.id:
+        await msg.reply_text(_hud_text("🥊 Member Message ကို Reply လုပ်ပြီး /duel 100 ပို့ပါ။")); return
+    if bet is None:
+        await msg.reply_text(_hud_text("🥊 /duel 100 ဖြင့် နှစ်ဦးလောင်းကြေး သတ်မှတ်ပါ။")); return
+    _account(update.effective_chat.id,user); _account(update.effective_chat.id,target)
     with db() as conn:
-        conn.execute(
-            "INSERT INTO game_duels(chat_id,challenger_id,opponent_id,challenger_name,opponent_name,created_at) "
-            "VALUES(?,?,?,?,?,?) ON CONFLICT(chat_id) DO UPDATE SET "
-            "challenger_id=excluded.challenger_id,opponent_id=excluded.opponent_id,"
-            "challenger_name=excluded.challenger_name,opponent_name=excluded.opponent_name,created_at=excluded.created_at",
-            (update.effective_chat.id, user.id, target.id, _display(user), _display(target), time.time()),
-        )
-    await msg.reply_text(_hud_text(
-        f"🥊 {_display(user)} က {_display(target)} ကို Duel စိန်ခေါ်လိုက်ပြီ။\n"
-        f"လက်ခံရန် /duelaccept | ငြင်းရန် /dueldecline\n"
-        "အနိုင်ရသူ +40 Coin / +20 XP ရမယ်။"
-    ))
-
+        row=conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",(update.effective_chat.id,user.id)).fetchone()
+        if int(row["coins"])<bet:
+            await msg.reply_text(_hud_text("❌ သင့် Coin မလုံလောက်ပါ။")); return
+        conn.execute("INSERT INTO game_duels(chat_id,challenger_id,opponent_id,challenger_name,opponent_name,created_at,wager) VALUES(?,?,?,?,?,?,?) ON CONFLICT(chat_id) DO UPDATE SET challenger_id=excluded.challenger_id,opponent_id=excluded.opponent_id,challenger_name=excluded.challenger_name,opponent_name=excluded.opponent_name,created_at=excluded.created_at,wager=excluded.wager",(update.effective_chat.id,user.id,target.id,_display(user),_display(target),time.time(),bet))
+    await msg.reply_text(_hud_text(f"🥊 {_display(user)} က {_display(target)} ကို Duel စိန်ခေါ်သည်!\nနှစ်ဦးလောင်းကြေး {bet:,} Coin\nလက်ခံရန် /duelaccept | ငြင်းရန် /dueldecline\n🏆 Winner ယူငွေ {bet*2:,} Coin"))
 
 async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _ready(update):
-        return
-    chat_id, user = update.effective_chat.id, update.effective_user
+    if not await _ready(update): return
+    chat_id,user=update.effective_chat.id,update.effective_user
     with db() as conn:
-        row = conn.execute("SELECT * FROM game_duels WHERE chat_id=?", (chat_id,)).fetchone()
-        if not row or float(row["created_at"]) < time.time() - 300:
-            conn.execute("DELETE FROM game_duels WHERE chat_id=?", (chat_id,))
-            await update.effective_message.reply_text(_hud_text("🥊 လက်ခံနိုင်တဲ့ Duel မရှိပါ။ /duel နဲ့ စိန်ခေါ်ပါ။"))
-            return
-        if int(row["opponent_id"]) != user.id:
-            await update.effective_message.reply_text(_hud_text("ဒီ Duel ကို စိန်ခေါ်ခံထားရသူသာ လက်ခံနိုင်ပါတယ်။"))
-            return
-        conn.execute("DELETE FROM game_duels WHERE chat_id=?", (chat_id,))
-    challenger_id = int(row["challenger_id"])
-    opponent_id = int(row["opponent_id"])
-    winner_id = random.choice([challenger_id, opponent_id])
-    winner_name = row["challenger_name"] if winner_id == challenger_id else row["opponent_name"]
-    loser_id = opponent_id if winner_id == challenger_id else challenger_id
-    msg = await update.effective_message.reply_text(_hud_text(
-        "🥊 NEXUS DUEL ARENA\n━━━━━━━━━━━━━━━━━━\n"
-        f"🔴 {row['challenger_name']}  VS  🔵 {row['opponent_name']}\n"
-        "⚡ ROUND 1 • FIGHT!"
-    ))
-    await _animate_hud(msg, [
-        f"🥊 DUEL • ROUND 1\n🔴 {row['challenger_name']}  VS  🔵 {row['opponent_name']}\n🔔 FIGHT!",
-        f"🥊 DUEL • ROUND 2\n🗡️ {row['challenger_name']} တိုက်ခိုက်!\n🛡️ {row['opponent_name']} ကာကွယ်!",
-        f"🥊 DUEL • ROUND 3\n💥 ပြင်းထန်တဲ့ တိုက်ချက်!\n⚡ FINAL ROUND!",
-        "🥊 DUEL • FINAL RESULT\n🏆 WINNER DECIDED...",
-    ], 0.65)
-    from telegram import User
-    winner = update.effective_user if winner_id == user.id else User(
-        id=challenger_id, first_name=row["challenger_name"], is_bot=False
-    )
-    _change(chat_id, winner, coins=DUEL_REWARD, xp=20, wins=1)
+        row=conn.execute("SELECT * FROM game_duels WHERE chat_id=?",(chat_id,)).fetchone()
+        if not row or float(row["created_at"])<time.time()-300:
+            conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
+            await update.effective_message.reply_text(_hud_text("🥊 လက်ခံနိုင်တဲ့ Duel မရှိပါ။")); return
+        if int(row["opponent_id"])!=user.id:
+            await update.effective_message.reply_text(_hud_text("စိန်ခေါ်ခံရသူသာ လက်ခံနိုင်ပါတယ်။")); return
+        wager=int(row["wager"] or 0); challenger=int(row["challenger_id"])
+        d1=conn.execute("UPDATE game_accounts SET coins=coins-? WHERE chat_id=? AND user_id=? AND coins>=?",(wager,chat_id,challenger,wager))
+        if d1.rowcount!=1:
+            conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
+            await update.effective_message.reply_text(_hud_text("❌ စိန်ခေါ်သူ Coin မလုံလောက်လို့ Duel ပယ်ဖျက်သည်။")); return
+        d2=conn.execute("UPDATE game_accounts SET coins=coins-? WHERE chat_id=? AND user_id=? AND coins>=?",(wager,chat_id,user.id,wager))
+        if d2.rowcount!=1:
+            conn.execute("UPDATE game_accounts SET coins=coins+? WHERE chat_id=? AND user_id=?",(wager,chat_id,challenger))
+            await update.effective_message.reply_text(_hud_text("❌ သင့် Coin မလုံလောက်ပါ။")); return
+        conn.execute("DELETE FROM game_duels WHERE chat_id=?",(chat_id,))
+    winner=random.choice([challenger,user.id]); loser=user.id if winner==challenger else challenger
+    winner_name=row["challenger_name"] if winner==challenger else row["opponent_name"]; payout=wager*2
+    m=await update.effective_message.reply_text(_hud_text(f"🥊 NEXUS DUEL\n🔴 {row['challenger_name']} VS 🔵 {row['opponent_name']}\nFIGHT!"))
+    await _animate_hud(m,["🥊 ROUND 1\n⚔️ FIGHT!","🥊 ROUND 2\n💥 CLASH!","🥊 FINAL ROUND\n🔥 FINISH MOVE!"],0.55)
     with db() as conn:
-        conn.execute(
-            "UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?",
-            (chat_id, loser_id),
-        )
-        winner_account = conn.execute(
-            "SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",
-            (chat_id, winner_id),
-        ).fetchone()
-    await msg.edit_text(_hud_text(
-        "🥊 NEXUS DUEL ARENA • RESULT\n━━━━━━━━━━━━━━━━━━\n"
-        f"🔴 {row['challenger_name']}  VS  🔵 {row['opponent_name']}\n"
-        f"🏆 အနိုင်ရသူ: {winner_name}\n"
-        f"🎁 ဆု: +{DUEL_REWARD} Coin / +20 XP\n"
-        f"🪙 လက်ကျန်: {winner_account['coins']:,} Coin"
-    ))
-
+        conn.execute("UPDATE game_accounts SET coins=coins+?,xp=xp+30,wins=wins+1 WHERE chat_id=? AND user_id=?",(payout,chat_id,winner))
+        conn.execute("UPDATE game_accounts SET xp=xp+10,losses=losses+1 WHERE chat_id=? AND user_id=?",(chat_id,loser))
+        bal=conn.execute("SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,winner)).fetchone()
+    await m.edit_text(_hud_text(f"🥊 DUEL RESULT\n🏆 Winner: {winner_name}\n💰 +{payout:,} Coin\n⭐ Winner +30 XP / Loser +10 XP\n🪙 Winner Balance: {bal['coins']:,}"))
 
 async def duel_decline(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update):
