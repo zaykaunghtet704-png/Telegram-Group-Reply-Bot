@@ -723,16 +723,16 @@ async def pick_mine(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 (chat_id, user.id),
             )
             wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)).fetchone()
-        board = "\\n".join(
+        board = "\n".join(
             " ".join("💣" if n in mines_set else ("💎" if n in opened else "❔")
                     for n in range(r * 5 + 1, r * 5 + 6))
             for r in range(5)
         )
         balance_now = int(wallet["coins"]) if wallet else 0
         await update.effective_message.reply_text(_hud_text(
-            f"💥 BOOM! MINE HIT! • #{cell}\\n{board}\\n"
-            f"📉 Bet ဆုံးရှုံး: {int(game['bet']):,} Coin\\n⭐ +2 XP"
-            f"\\n🪙 လက်ကျန်: {balance_now:,} Coin"
+            f"💥 BOOM! MINE HIT! • #{cell}\n{board}\n"
+            f"📉 Bet ဆုံးရှုံး: {int(game['bet']):,} Coin\n⭐ +2 XP"
+            f"\n🪙 လက်ကျန်: {balance_now:,} Coin"
         ))
         return
     opened.add(cell)
@@ -744,17 +744,17 @@ async def pick_mine(update: Update, context: ContextTypes.DEFAULT_TYPE):
         wallet = conn.execute("SELECT coins FROM game_wallets WHERE user_id=?", (user.id,)).fetchone()
     multiplier = _mine_multiplier(len(opened))
     payout = int(int(game["bet"]) * multiplier)
-    board = "\\n".join(
+    board = "\n".join(
         " ".join("💎" if n in opened else "❔" for n in range(r * 5 + 1, r * 5 + 6))
         for r in range(5)
     )
     balance_now = int(wallet["coins"]) if wallet else 0
     await update.effective_message.reply_text(
         _hud_text(
-            f"💎 SAFE PICK! • #{cell}\\n{board}\\n"
+            f"💎 SAFE PICK! • #{cell}\n{board}\n"
             f"✅ Safe: {len(opened)} | 📈 Multiplier: {multiplier:g}x"
-            f"\\n💰 Cashout: {payout:,} Coin | 🪙 လက်ကျန်: {balance_now:,}"
-            f"\\nနောက်အကွက် /pick 1-25 သို့မဟုတ် /cashout"
+            f"\n💰 Cashout: {payout:,} Coin | 🪙 လက်ကျန်: {balance_now:,}"
+            f"\nနောက်အကွက် /pick 1-25 သို့မဟုတ် /cashout"
         ),
         reply_markup=_mine_keyboard(user.id, opened),
     )
