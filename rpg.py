@@ -154,6 +154,7 @@ async def rpg_profile(update, context):
              InlineKeyboardButton("🏆 Leaderboard", callback_data="rpg:top")],
             [InlineKeyboardButton("🐉 World Boss", callback_data="rpg:boss"),
              InlineKeyboardButton("🛡 Guild", callback_data="rpg:guild")],
+            [InlineKeyboardButton("🌌 ULTIMATE RPG WORLD", callback_data="rpgx:menu")],
             [InlineKeyboardButton("📖 ဘယ်လိုကစားမလဲ?", callback_data="rpg:help")],
         ]),
     )
