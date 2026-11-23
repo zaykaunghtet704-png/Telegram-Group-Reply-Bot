@@ -65,14 +65,19 @@ async def global_access_guard(update, context):
     if banned:
         notice = "🚫 သင့်အကောင့်ကို Bot အသုံးပြုခွင့် ပိတ်ထားပါတယ်။"
     elif maintenance:
-        # Keep the group coin/game system usable during general bot maintenance.
+        # Keep every group game command and interactive Minefield button usable
+        # while unrelated bot features are in maintenance mode.
+        query = update.callback_query
+        if query and (query.data or "").startswith("mine:"):
+            return
         msg = update.effective_message
         raw = (msg.text or "").strip() if msg else ""
         command = raw.split(maxsplit=1)[0].split("@", 1)[0].lower() if raw.startswith("/") else ""
         game_commands = {
-            "/games", "/balance", "/daily", "/topcoins", "/quiz", "/answer",
-            "/fish", "/hunt", "/spin", "/duel", "/duelaccept",
-            "/dueldecline", "/game",
+            "/games", "/balance", "/rank", "/daily", "/topcoins", "/toprank",
+            "/quiz", "/answer", "/fish", "/hunt", "/spin", "/mines",
+            "/pick", "/cashout", "/duel", "/duelaccept", "/dueldecline",
+            "/game",
         }
         if command in game_commands:
             return
@@ -1445,7 +1450,7 @@ async def post_init(app):
         ("rank", "Show player rank profile"),
         ("toprank", "XP and rank leaderboard"),
         ("daily", "Claim daily game coins"),
-        ("topcoins", "Group coin leaderboard"),
+        ("topcoins", "Global coin leaderboard"),
         ("quiz", "Start a group quiz"),
         ("answer", "Answer the active quiz"),
         ("fish", "Go fishing for coins"),
