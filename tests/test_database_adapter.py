@@ -102,13 +102,27 @@ class DatabaseAdapterTests(unittest.TestCase):
 
         raw_connections = []
 
-        def make_raw(*args, **kwargs):
-            raw = CaptureRaw()
-            raw_connections.append(raw)
-            return raw
+        class FakePool:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def open(self, wait=True, timeout=10):
+                pass
+
+            def getconn(self, timeout=10):
+                raw = CaptureRaw()
+                raw_connections.append(raw)
+                return raw
+
+            def putconn(self, raw):
+                pass
+
+            def close(self):
+                pass
 
         with patch.object(database, "DATABASE_URL", "postgresql://test"), \
-             patch.object(database.psycopg, "connect", side_effect=make_raw):
+             patch.object(database, "_POOL", None), \
+             patch.object(database, "ConnectionPool", FakePool):
             bot.init_db()
             learning.init_learning_db()
             security.init_security_db()
