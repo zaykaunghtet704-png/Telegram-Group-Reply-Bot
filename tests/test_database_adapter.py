@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import patch
 
+from telegram.ext import CommandHandler
+
 import database
 import bot
 import security
@@ -128,6 +130,16 @@ class DatabaseAdapterTests(unittest.TestCase):
                 sql,
                 r"TEXT\s+NOT\s+NULL\s+DEFAULT\s+CURRENT_TIMESTAMP(?!::text)",
             )
+
+    def test_relationship_post_delete_command_is_registered(self):
+        handlers = relationship.relationship_handlers()
+        commands = {
+            command
+            for handler in handlers
+            if isinstance(handler, CommandHandler)
+            for command in handler.commands
+        }
+        self.assertIn("lovedeleteposts", commands)
 
     def test_legacy_pragma_returns_sqlite_compatible_rows(self):
         raw = FakeRawConnection()
