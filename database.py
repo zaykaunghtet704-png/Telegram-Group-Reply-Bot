@@ -22,7 +22,8 @@ MIGRATION_TABLES = (
     "moderation_settings", "warnings", "learning_settings", "learned_pairs",
     "learn_pending", "member_profiles", "member_notes", "member_reports", "group_rules",
     "owner_settings", "owner_action_logs", "owner_bans", "love_profiles", "love_channels", "love_group_settings", "love_dm_subscribers", "love_likes", "love_blocks", "love_reports", "love_deliveries",
-    "game_groups", "game_accounts", "game_cooldowns", "game_quizzes", "game_duels",\n    "coin_codes", "coin_code_redemptions",
+    "game_groups", "game_accounts", "game_cooldowns", "game_quizzes", "game_duels",
+    "coin_codes", "coin_code_redemptions",
 )
 
 
