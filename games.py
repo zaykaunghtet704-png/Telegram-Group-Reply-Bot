@@ -153,6 +153,12 @@ def _hud_text(value):
     )
 
 
+async def _animate_hud(message, frames, delay=0.55):
+    """Edit one Telegram message through short game-animation frames."""
+    for frame in frames:
+        await message.edit_text(_hud_text(frame))
+        await asyncio.sleep(delay)
+
 def _level(xp):
     return 1 + int(max(0, xp) // 100)
 
@@ -270,10 +276,19 @@ async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "answer=excluded.answer,expires_at=excluded.expires_at",
             (chat_id, question, json.dumps(options, ensure_ascii=False), answer, time.time() + 90),
         )
+    msg = await update.effective_message.reply_text(_hud_text(
+        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n"
+        "🎮 စိန်ခေါ်မှုတစ်ခု ပြင်ဆင်နေသည်...\n⚡ READY?"
+    ))
+    await _animate_hud(msg, [
+        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n🔍 မေးခွန်းရှာဖွေနေသည်...\n▰▱▱",
+        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n🎯 အဖြေရွေးချယ်စရာများ ပြင်ဆင်နေသည်...\n▰▰▱",
+        "🧠 NEXUS QUIZ ARENA\n━━━━━━━━━━━━━━━━━━\n🚀 QUIZ START!\n▰▰▰",
+    ], 0.45)
     lines = ["╔══════════════════════╗", "   🧠 3D ARENA • QUIZ", "╚══════════════════════╝", "🎮 PLAYER: " + _display(update.effective_user), "━━━━━━━━━━━━━━━━━━━━", "❓ " + question]
     lines.extend(f"{i}. {option}" for i, option in enumerate(options, 1))
     lines.append("\n/answer 1-4 ဖြေပါ။ ပထမဆုံးမှန်သူ +25 Coin / +10 XP ရမယ်။ (90 စက္ကန့်)")
-    await update.effective_message.reply_text(_hud_text("\n".join(lines)))
+    await msg.edit_text(_hud_text("\n".join(lines)))
 
 
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -309,15 +324,26 @@ async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text(_hud_text(f"🎣 နောက်တစ်ကြိမ် ငါးဖမ်းရန် {wait} စက္ကန့် စောင့်ပါ။"))
         return
     chosen = random.choices(FISH, weights=[x[3] for x in FISH], k=1)[0]
-    if chosen:
-        name, low, high, _ = chosen
-        reward = random.randint(low, high)
-        row = _change(chat_id, user, coins=reward, xp=5)
-        await update.effective_message.reply_text(_hud_text(
-            f"🎣 {name} ဖမ်းမိပြီ။ +{reward} Coin / +5 XP\n🪙 လက်ကျန် {row['coins']:,}"
-        ))
-    else:
-        await update.effective_message.reply_text(_hud_text("🌊 ဒီတစ်ခေါက် ငါးမမိပါဘူး။ နောက်တစ်ကြိမ် ကြိုးစားပါ။"))
+    msg = await update.effective_message.reply_text(_hud_text(
+        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n"
+        "🌊 ရေကန်ထဲ ငါးမျှားချိတ်ချလိုက်ပြီ...\n🎣 ────────"
+    ))
+    await _animate_hud(msg, [
+        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n🌊 ရေပြင်ငြိမ်သက်နေသည်...\n🎣 ────────",
+        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n🐟 တစ်ခုခု ချိတ်မိနေပြီ!\n〰️〰️〰️",
+        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n‼️ ငါးက ဆွဲနေပြီ!\n💦 SPLASH!",
+        "🎣 NEXUS FISHING ZONE\n━━━━━━━━━━━━━━━━━━\n⬆️ ငါးကို ဆွဲတင်နေသည်...\n🎣 ⬆️",
+    ], 0.55)
+    name, low, high, _ = chosen
+    reward = random.randint(low, high)
+    row = _change(chat_id, user, coins=reward, xp=5)
+    await msg.edit_text(_hud_text(
+        "🎣 NEXUS FISHING • CATCH RESULT\n━━━━━━━━━━━━━━━━━━\n"
+        f"🐠 ဖမ်းမိသောငါး: {name}\n"
+        f"🎁 ဆု: +{reward} Coin / +5 XP\n"
+        f"🪙 လက်ကျန်: {row['coins']:,} Coin\n"
+        "🏆 NICE CATCH!"
+    ))
 
 
 async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -329,16 +355,36 @@ async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text(_hud_text(f"⚔️ နောက်တစ်ကြိမ် Hunt လုပ်ရန် {wait} စက္ကန့် စောင့်ပါ။"))
         return
     monster = random.choice(["Goblin", "Wolf", "Shadow Beast", "Dragonling"])
-    if random.randint(1, 100) <= 65:
+    won = random.randint(1, 100) <= 65
+    msg = await update.effective_message.reply_text(_hud_text(
+        "⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n"
+        f"👹 ENEMY: {monster}\n🛡️ PLAYER: {user.full_name}\n"
+        "⚡ BATTLE START!"
+    ))
+    await _animate_hud(msg, [
+        f"⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n👹 {monster} ပေါ်လာပြီ!\n🛡️ DEFEND!",
+        f"⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n🗡️ PLAYER ATTACK!\n💥 တိုက်ခိုက်နေသည်...",
+        f"⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n👹 {monster} ပြန်တိုက်လာပြီ!\n⚡ CLASH!",
+        f"⚔️ NEXUS MONSTER HUNT\n━━━━━━━━━━━━━━━━━━\n🎯 နောက်ဆုံးတိုက်ချက်!\n🔥 FINISH MOVE!",
+    ], 0.6)
+    if won:
         reward = random.randint(20, 55)
         row = _change(chat_id, user, coins=reward, xp=20, wins=1)
-        await update.effective_message.reply_text(_hud_text(
-            f"⚔️ {monster} ကို အနိုင်ယူလိုက်ပြီ။ +{reward} Coin / +20 XP\n"
+        result = (
+            f"🏆 VICTORY! {monster} ကို အနိုင်ယူလိုက်ပြီ။\n"
+            f"🎁 +{reward} Coin / +20 XP\n"
             f"🪙 လက်ကျန်: {row['coins']:,} | Level: {_level(row['xp'])}"
-        ))
+        )
     else:
-        _change(chat_id, user, xp=5, losses=1)
-        await update.effective_message.reply_text(_hud_text(f"💥 {monster} က အနိုင်ရသွားတယ်။ +5 XP ရပါတယ်။ နောက်တစ်ကြိမ် ကြိုးစားပါ။"))
+        row = _change(chat_id, user, xp=5, losses=1)
+        result = (
+            f"💥 DEFEAT! {monster} က အနိုင်ရသွားတယ်။\n"
+            f"⭐ +5 XP ရပါတယ်။\n🪙 လက်ကျန်: {row['coins']:,} Coin"
+        )
+    await msg.edit_text(_hud_text(
+        "⚔️ NEXUS MONSTER HUNT • RESULT\n━━━━━━━━━━━━━━━━━━\n"
+        f"👹 ENEMY: {monster}\n{result}"
+    ))
 
 
 async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -496,21 +542,42 @@ async def duel_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.effective_message.reply_text(_hud_text("ဒီ Duel ကို စိန်ခေါ်ခံထားရသူသာ လက်ခံနိုင်ပါတယ်။"))
             return
         conn.execute("DELETE FROM game_duels WHERE chat_id=?", (chat_id,))
-    winner_id = random.choice([int(row["challenger_id"]), int(row["opponent_id"])])
-    winner = update.effective_user if winner_id == user.id else None
-    if winner is None:
-        from telegram import User
-        winner = User(id=int(row["challenger_id"]), first_name=row["challenger_name"], is_bot=False)
+    challenger_id = int(row["challenger_id"])
+    opponent_id = int(row["opponent_id"])
+    winner_id = random.choice([challenger_id, opponent_id])
+    winner_name = row["challenger_name"] if winner_id == challenger_id else row["opponent_name"]
+    loser_id = opponent_id if winner_id == challenger_id else challenger_id
+    msg = await update.effective_message.reply_text(_hud_text(
+        "🥊 NEXUS DUEL ARENA\n━━━━━━━━━━━━━━━━━━\n"
+        f"🔴 {row['challenger_name']}  VS  🔵 {row['opponent_name']}\n"
+        "⚡ ROUND 1 • FIGHT!"
+    ))
+    await _animate_hud(msg, [
+        f"🥊 DUEL • ROUND 1\n🔴 {row['challenger_name']}  VS  🔵 {row['opponent_name']}\n🔔 FIGHT!",
+        f"🥊 DUEL • ROUND 2\n🗡️ {row['challenger_name']} တိုက်ခိုက်!\n🛡️ {row['opponent_name']} ကာကွယ်!",
+        f"🥊 DUEL • ROUND 3\n💥 ပြင်းထန်တဲ့ တိုက်ချက်!\n⚡ FINAL ROUND!",
+        "🥊 DUEL • FINAL RESULT\n🏆 WINNER DECIDED...",
+    ], 0.65)
+    from telegram import User
+    winner = update.effective_user if winner_id == user.id else User(
+        id=challenger_id, first_name=row["challenger_name"], is_bot=False
+    )
     _change(chat_id, winner, coins=DUEL_REWARD, xp=20, wins=1)
-    loser_id = int(row["opponent_id"]) if winner_id == int(row["challenger_id"]) else int(row["challenger_id"])
     with db() as conn:
         conn.execute(
             "UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?",
             (chat_id, loser_id),
         )
-    await update.effective_message.reply_text(_hud_text(
-        f"🏆 Duel ပြီးဆုံးပါပြီ။\nအနိုင်ရသူ: {winner.full_name}\n"
-        f"🎁 ဆု: +{DUEL_REWARD} Coin / +20 XP"
+        winner_account = conn.execute(
+            "SELECT coins FROM game_accounts WHERE chat_id=? AND user_id=?",
+            (chat_id, winner_id),
+        ).fetchone()
+    await msg.edit_text(_hud_text(
+        "🥊 NEXUS DUEL ARENA • RESULT\n━━━━━━━━━━━━━━━━━━\n"
+        f"🔴 {row['challenger_name']}  VS  🔵 {row['opponent_name']}\n"
+        f"🏆 အနိုင်ရသူ: {winner_name}\n"
+        f"🎁 ဆု: +{DUEL_REWARD} Coin / +20 XP\n"
+        f"🪙 လက်ကျန်: {winner_account['coins']:,} Coin"
     ))
 
 
