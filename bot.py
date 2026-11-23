@@ -32,7 +32,7 @@ from learning import (
     delete_learned, clear_pending,
 )
 from coin_codes import (init_coin_codes, create_coin_code, redeem_coin_code, revoke_coin_code, coin_code_stats)
-from rpg import (init_rpg, rpg_profile, missions_command, mission_claim_command, achievements_command, shop_command, buy_command, inventory_command, equip_command)
+from rpg import (init_rpg, rpg_profile, missions_command, mission_claim_command, achievements_command, shop_command, buy_command, inventory_command, equip_command, rpg_daily_command, adventure_command, rpg_top_command)
 from games import (
     init_games, set_games_enabled, game_help, balance, rank, toprank, daily, topcoins,
     quiz, answer, fish, hunt, mines, mine_callback, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
@@ -79,7 +79,7 @@ async def global_access_guard(update, context):
             "/games", "/balance", "/rank", "/daily", "/topcoins", "/toprank",
             "/quiz", "/answer", "/fish", "/hunt", "/spin", "/mines",
             "/pick", "/cashout", "/duel", "/duelaccept", "/dueldecline", "/redeem",
-            "/rpg", "/missions", "/missionclaim", "/achievements", "/shop", "/buy", "/inventory", "/equip",
+            "/rpg", "/missions", "/missionclaim", "/achievements", "/shop", "/buy", "/inventory", "/equip", "/rpgdaily", "/adventure", "/rpgtop",
             "/game",
         }
         if command in game_commands:
@@ -1664,6 +1664,10 @@ async def post_init(app):
         ("duel", "Challenge a member to a duel"),
         ("duelaccept", "Accept a duel challenge"),
         ("dueldecline", "Decline a duel challenge"),
+        ("rpg", "Show your RPG profile"),
+        ("rpgdaily", "Claim RPG login streak rewards"),
+        ("adventure", "Explore a solo RPG dungeon"),
+        ("rpgtop", "Show the RPG XP leaderboard"),
         ("game", "Admin: enable or disable group games"),
         ("panel", "Admin dashboard"),
         ("addreply", "Add keyword reply"),
@@ -1786,6 +1790,9 @@ def main():
     app.add_handler(CommandHandler("buy", buy_command))
     app.add_handler(CommandHandler("inventory", inventory_command))
     app.add_handler(CommandHandler("equip", equip_command))
+    app.add_handler(CommandHandler("rpgdaily", rpg_daily_command))
+    app.add_handler(CommandHandler("adventure", adventure_command))
+    app.add_handler(CommandHandler("rpgtop", rpg_top_command))
     app.add_handler(CommandHandler("balance", balance))
     app.add_handler(CommandHandler("rank", rank))
     app.add_handler(CommandHandler("toprank", toprank))
