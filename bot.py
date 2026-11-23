@@ -33,7 +33,7 @@ from learning import (
 )
 from games import (
     init_games, set_games_enabled, game_help, balance, rank, toprank, daily, topcoins,
-    quiz, answer, fish, hunt, mines, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
+    quiz, answer, fish, hunt, mines, mine_callback, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
     addcoins, takecoins,
 )
 
@@ -1543,6 +1543,7 @@ def main():
     app.add_handler(TypeHandler(Update, global_access_guard), group=-20)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(start_menu_callback, pattern=r"^start:"))
+    app.add_handler(CallbackQueryHandler(mine_callback, pattern=r"^mine:"))
     app.add_handler(CommandHandler("owner", lambda u, c: owner_command(u, c, OWNER_ID)))
     app.add_handler(CommandHandler("ownerban", lambda u, c: owner_ban_command(u, c, OWNER_ID)))
     app.add_handler(CommandHandler("ownerunban", lambda u, c: owner_unban_command(u, c, OWNER_ID)))
