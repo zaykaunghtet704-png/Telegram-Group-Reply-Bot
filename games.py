@@ -15,6 +15,9 @@ DAILY_COINS = 50
 QUIZ_REWARD = 25
 DUEL_REWARD = 40
 
+# Chance-game tuning: approximate theoretical coin return (RTP) is 94–98%.
+# PvP Duel remains an even 50/50 contest with no house edge.
+
 def _build_quiz_bank():
     """Generate exactly 20,000 deterministic arithmetic questions."""
     bank = []
@@ -546,7 +549,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.execute("DELETE FROM game_quizzes WHERE chat_id=?",(chat_id,))
         for p in players:
             if int(p["user_id"])!=user.id: conn.execute("UPDATE game_accounts SET losses=losses+1 WHERE chat_id=? AND user_id=?",(chat_id,int(p["user_id"])))
-        payout=int(player["bet"])*2
+        payout=int(round(int(player["bet"])*3.6))
         _wallet_adjust(conn, user.id, payout)
         conn.execute("UPDATE game_accounts SET xp=xp+25,wins=wins+1 WHERE chat_id=? AND user_id=?",(chat_id,user.id))
         row=conn.execute("SELECT * FROM game_accounts WHERE chat_id=? AND user_id=?",(chat_id,user.id)).fetchone()
@@ -556,7 +559,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     record_game_event(user.id, True, 25)
     m=await update.effective_message.reply_text(_hud_text("🧠 QUIZ RESULT\n🏆 Winner detected..."))
     await _animate_hud(m,["🔓 REWARD UNLOCKED!","🎉 CORRECT ANSWER!"],0.35)
-    await m.edit_text(_hud_text(f"🏆 {user.full_name} အနိုင်ရ!\n🎁 {int(player['bet']):,} × 2 = +{payout:,} Coin\n⭐ +25 XP\n🪙 လက်ကျန် {row['coins']:,}"))
+    await m.edit_text(_hud_text(f"🏆 {user.full_name} အနိုင်ရ!\n🎁 {int(player['bet']):,} × 3.6 = +{payout:,} Coin\n⭐ +25 XP\n🪙 လက်ကျန် {row['coins']:,}"))
 
 async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _ready(update): return
@@ -567,7 +570,7 @@ async def fish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if _stake(chat_id,user,bet) is None:
         await update.effective_message.reply_text(_hud_text("❌ Coin မလုံလောက်ပါ။ /balance စစ်ပါ။")); return
     name,_,_,_=random.choices(FISH,weights=[x[3] for x in FISH],k=1)[0]
-    mult={"ငါးသေး":0.5,"ငါးကြင်း":1.2,"ငါးကြီး":2.0,"ရွှေငါး":5.0}.get(name,0.5)
+    mult={"ငါးသေး":0.5,"ငါးကြင်း":1.1,"ငါးကြီး":1.8,"ရွှေငါး":4.0}.get(name,0.5)
     payout=int(bet*mult); won=payout>bet
     m=await update.effective_message.reply_text(_hud_text("🎣 NEXUS FISHING ZONE\n🌊 ငါးမျှားချိတ်ချလိုက်ပြီ..."))
     await _animate_hud(m,["🌊 ရေပြင်လှုပ်ရှားနေသည်...","🐟 ငါးချိတ်မိပြီ! 💦 SPLASH!","⬆️ ငါးကိုဆွဲတင်နေသည်..."],0.5)
@@ -587,7 +590,7 @@ async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if _stake(chat_id,user,bet) is None:
         await update.effective_message.reply_text(_hud_text("❌ Coin မလုံလောက်ပါ။ /balance စစ်ပါ။")); return
     monster=random.choice(["Goblin","Wolf","Shadow Beast","Dragonling"])
-    won=random.randint(1,100)<=60; payout=bet*2 if won else 0
+    won=random.randint(1,100)<=47; payout=bet*2 if won else 0
     m=await update.effective_message.reply_text(_hud_text(f"⚔️ MONSTER HUNT\n👹 {monster}\n⚡ BATTLE START!"))
     await _animate_hud(m,[f"👹 {monster} ပေါ်လာပြီ!\n🛡️ DEFEND!","🗡️ PLAYER ATTACK!\n💥 CLASH!","🔥 FINAL STRIKE!\n⚡ FINISH MOVE!"],0.55)
     with db() as conn:
@@ -598,7 +601,7 @@ async def hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await m.edit_text(_hud_text(f"⚔️ HUNT RESULT • {'🏆 VICTORY' if won else '💥 DEFEAT'}\n👹 {monster}\n{'💰 Payout: '+format(payout,',')+' Coin (2x)' if won else '📉 Bet lost: '+format(bet,',')+' Coin'}\n⭐ XP +{20 if won else 5}\n🪙 Balance: {row['coins']:,}"))
 
 
-MINES_MULTIPLIERS = [1.25, 1.60, 2.10, 2.85, 3.95, 5.60, 8.20, 12.5, 20.0, 35.0]
+MINES_MULTIPLIERS = [1.08, 1.23, 1.42, 1.64, 1.92, 2.26, 2.68, 3.21, 3.90, 4.80]
 
 
 MINES_MULTIPLIERS = [1.25, 1.60, 2.10, 2.85, 3.95, 5.60, 8.20, 12.5, 20.0, 35.0]
@@ -856,8 +859,8 @@ async def spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ))
             return
 
-    # Existing slot odds are preserved. A winning symbol determines the payout multiplier.
-    reward = random.choices([0, 10, 25, 50, 100, 200], weights=[20, 25, 25, 18, 10, 2], k=1)[0]
+    # Published slot odds target about 93.8% theoretical return before XP rewards.
+    reward = random.choices([0, 10, 25, 50, 100, 200], weights=[43, 24, 18, 9, 5, 1], k=1)[0]
     prize_icons = {10: "🍒", 25: "🍋", 50: "🍉", 100: "🍇", 200: "💎"}
     multipliers = {10: 1.2, 25: 1.5, 50: 2.0, 100: 3.0, 200: 5.0}
     symbols = ["🍒", "🍋", "🍉", "🍇", "🍊", "⭐", "💎"]
