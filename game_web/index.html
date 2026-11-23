@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="my">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#07111f"><title>Nexus 3D Game Hub</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{color-scheme:dark;--cyan:#61e7ef;--gold:#ffd36a;--panel:#101f31dd}*{box-sizing:border-box}body{margin:0;background:#07111f;color:#f5f8ff;font-family:system-ui,-apple-system,sans-serif;overflow:hidden}#scene{position:fixed;inset:0;z-index:0}#hud{position:fixed;inset:0;z-index:2;pointer-events:none;padding:12px;display:flex;flex-direction:column;justify-content:space-between}.top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.panel{background:var(--panel);border:1px solid #8ceaf044;backdrop-filter:blur(12px);border-radius:16px;padding:10px 13px;box-shadow:0 8px 28px #0005}.brand{font-weight:900;letter-spacing:1px;color:var(--cyan)}.stats{font-size:13px;line-height:1.65}.bottom{display:flex;justify-content:space-between;align-items:end;gap:12px}.controls{display:flex;gap:8px;pointer-events:auto;flex-wrap:wrap;justify-content:flex-end}.btn{border:1px solid #75eaf066;background:#142a40eF;color:white;border-radius:14px;padding:12px 14px;font-weight:800;min-width:74px;box-shadow:0 5px 16px #0005}.btn:active{transform:scale(.95);background:#24516b}.btn.gold{background:#60451b;border-color:#ffd36a}.joy{width:118px;height:118px;border-radius:50%;background:#d7f9ff22;border:2px solid #d7f9ff66;position:relative;pointer-events:auto;touch-action:none}.knob{width:44px;height:44px;border-radius:50%;background:#61e7efbb;position:absolute;left:35px;top:35px;box-shadow:0 0 20px #61e7ef88}.overlay{position:fixed;inset:0;z-index:5;background:#030914df;display:flex;align-items:center;justify-content:center;padding:18px}.modal{width:min(480px,100%);background:#102238;border:1px solid #61e7ef55;border-radius:22px;padding:20px;max-height:90vh;overflow:auto}.title{font-size:24px;font-weight:900;margin:0 0 8px}.muted{color:#a9bed2;font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.tile{padding:15px 10px;border-radius:16px;text-align:left;min-height:100px;background:linear-gradient(145deg,#183a52,#111d31);border:1px solid #65dfea44;color:white}.tile b{display:block;font-size:16px;margin:6px 0}.tile span{font-size:28px}.hidden{display:none!important}#notice{position:fixed;z-index:8;top:44%;left:50%;transform:translate(-50%,-50%);background:#071827ed;border:1px solid #6ce8ed;padding:16px 20px;border-radius:16px;text-align:center;max-width:85%;display:none}.small{font-size:12px;color:#b5c8d8}.actionrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actionrow button{flex:1}
+</style></head>
+<body>
+<div id="scene"></div>
+<div id="hud">
+ <div class="top">
+  <div class="panel"><div class="brand">NEXUS 3D WORLD</div><div class="stats" id="player">Loading player…</div></div>
+  <div class="panel stats" id="wallet">🪙 —</div>
+ </div>
+ <div class="bottom">
+  <div class="joy" id="joy"><div class="knob" id="knob"></div></div>
+  <div class="controls">
+   <button class="btn" id="jump">⬆ JUMP</button>
+   <button class="btn gold" id="action">🎮 PLAY</button>
+   <button class="btn" id="menu">☰ MENU</button>
+  </div>
+ </div>
+</div>
+<div class="overlay" id="menuLayer"><div class="modal">
+ <p class="brand">NEXUS • 3D GAME HUB</p><h1 class="title">Choose Your World</h1><p class="muted">3D Mini Games · Group Coins · XP & Levels</p>
+ <div class="grid">
+  <button class="tile" data-mode="fish"><span>🎣</span><b>Fishing Lake</b><small>ငါးမျှားပြီး Coin ရယူပါ</small></button>
+  <button class="tile" data-mode="hunt"><span>⚔️</span><b>Monster Hunt</b><small>Monster ကို တိုက်ခိုက်ပါ</small></button>
+  <button class="tile" data-mode="quiz"><span>🧠</span><b>Quiz Battle</b><small>မေးခွန်းဖြေပြီး Coin ရယူပါ</small></button>
+  <button class="tile" data-mode="spin"><span>🎰</span><b>Lucky Spin</b><small>ဆုဘီး လှည့်ပါ</small></button>
+  <button class="tile" data-mode="duel" style="grid-column:span 2"><span>🥊</span><b>1v1 Duel</b><small>Multiplayer Arena — အဆင့်ဆင့် ချိတ်ဆက်နေဆဲ</small></button>
+ </div><div class="actionrow"><button class="btn" id="closeMenu">WORLD ထဲဝင်မယ်</button></div>
+ <p class="small">Joystick ကို ဆွဲပြီး Character ကို လှုပ်ရှားပါ။ Game ဆုတွေကို Bot ရဲ့ Group Coin ထဲ သိမ်းပါတယ်။</p>
+ </div></div>
+<div class="overlay hidden" id="gameLayer"><div class="modal" id="gameModal"><p class="brand" id="gameTag">MINI GAME</p><h2 class="title" id="gameTitle">Game</h2><div id="gameBody"></div><div class="actionrow"><button class="btn" id="backMenu">← Game Menu</button></div></div></div>
+<div id="notice"></div>
+<script>
+const tg=window.Telegram?.WebApp; tg?.ready(); tg?.expand();
+const params=new URLSearchParams(location.search); const chatId=params.get('chat_id');
+let initData=tg?.initData||'', mode='world', profile=null, scene, camera, renderer, player, ground, monster, fishMesh, clock, move={x:0,z:0}, yaw=0, bob=0;
+const $=id=>document.getElementById(id);
+function toast(t){$('notice').textContent=t;$('notice').style.display='block';setTimeout(()=>$('notice').style.display='none',2400)}
+async function api(path,method='GET',body={}){const r=await fetch(path,{method,headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},...(method==='POST'?{body:JSON.stringify({...body,chat_id:Number(chatId)})}:{})});const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}
+function updateProfile(d){profile=d.account||d; $('player').innerHTML=(d.user?.name||'Player')+'<br>⭐ Lv.'+(d.level||1)+' · XP '+(profile.xp||0);$('wallet').innerHTML='🪙 '+Number(profile.coins||0).toLocaleString()+'<br>🏆 '+(profile.wins||0)+' Wins'}
+function init3D(){
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x86c8db);scene.fog=new THREE.Fog(0x86c8db,22,75);
+ camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,150);renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;$('scene').appendChild(renderer.domElement);
+ scene.add(new THREE.HemisphereLight(0xc9f4ff,0x39512d,1.7));const sun=new THREE.DirectionalLight(0xfff1d0,2);sun.position.set(8,18,10);sun.castShadow=true;scene.add(sun);
+ ground=new THREE.Mesh(new THREE.PlaneGeometry(140,140),new THREE.MeshStandardMaterial({color:0x3f9258,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+ // lake
+ const lake=new THREE.Mesh(new THREE.CircleGeometry(7,48),new THREE.MeshStandardMaterial({color:0x269fca,roughness:.24,metalness:.15}));lake.rotation.x=-Math.PI/2;lake.position.set(0,.035,-8);scene.add(lake);
+ const rim=new THREE.Mesh(new THREE.TorusGeometry(7,.18,8,48),new THREE.MeshStandardMaterial({color:0x9bd8c0}));rim.rotation.x=Math.PI/2;rim.position.set(0,.1,-8);scene.add(rim);
+ for(let i=0;i<35;i++){let x=(Math.random()-.5)*55,z=(Math.random()-.5)*55;if(Math.abs(x)<9&&z<-1&&z>-16)continue;tree(x,z)}
+ player=new THREE.Group();const body=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.8,4,8),new THREE.MeshStandardMaterial({color:0x2878d0}));body.position.y=1;body.castShadow=true;player.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.32,16,12),new THREE.MeshStandardMaterial({color:0xffd1a5}));head.position.y=1.75;head.castShadow=true;player.add(head);const pack=new THREE.Mesh(new THREE.BoxGeometry(.45,.5,.25),new THREE.MeshStandardMaterial({color:0xf0b43c}));pack.position.set(0,1,.4);player.add(pack);player.position.set(0,0,4);scene.add(player);
+ for(let i=0;i<6;i++){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.5+Math.random()*.7),new THREE.MeshStandardMaterial({color:0x788b85}));rock.position.set((Math.random()-.5)*35,.35,(Math.random()-.5)*35);rock.castShadow=true;scene.add(rock)}
+ clock=new THREE.Clock();animate();window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+}
+function tree(x,z){const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18,.28,1.5,7),new THREE.MeshStandardMaterial({color:0x765034}));trunk.position.set(x,.75,z);trunk.castShadow=true;scene.add(trunk);const top=new THREE.Mesh(new THREE.ConeGeometry(1.25,2.7,8),new THREE.MeshStandardMaterial({color:Math.random()>.5?0x247849:0x327f52}));top.position.set(x,2.5,z);top.castShadow=true;scene.add(top)}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);if(player){player.position.x+=move.x*dt*6;player.position.z+=move.z*dt*6;player.position.x=THREE.MathUtils.clamp(player.position.x,-28,28);player.position.z=THREE.MathUtils.clamp(player.position.z,-28,28);if(Math.abs(move.x)+Math.abs(move.z)>.05){player.rotation.y=Math.atan2(move.x,move.z);bob+=dt*10;player.position.y=Math.abs(Math.sin(bob))*.09}else player.position.y=0;camera.position.lerp(new THREE.Vector3(player.position.x,player.position.y+6,player.position.z+10),.08);camera.lookAt(player.position.x,1,player.position.z-2)}if(monster){monster.rotation.y+=dt*1.5;monster.position.y=1.1+Math.sin(clock.elapsedTime*3)*.15}if(fishMesh){fishMesh.position.y=.4+Math.sin(clock.elapsedTime*2)*.08}renderer.render(scene,camera)}
+function setMode(m){mode=m; $('menuLayer').classList.add('hidden');if(m==='world'){toast('World ထဲကို ဝင်လိုက်ပါပြီ။ Joystick နဲ့ လှုပ်ရှားပါ။');return}openGame(m)}
+async function openGame(m){$('gameLayer').classList.remove('hidden');$('gameBody').innerHTML='<p>Loading…</p>';const names={fish:'🎣 Fishing Lake',hunt:'⚔️ Monster Hunt',quiz:'🧠 Quiz Battle',spin:'🎰 Lucky Spin',duel:'🥊 1v1 Duel'};$('gameTitle').textContent=names[m]||'Game';$('gameTag').textContent='NEXUS MINI GAME';try{if(m==='duel')throw Error('1v1 real-time Multiplayer Arena ကို နောက်အဆင့်မှာ ချိတ်ဆက်ပေးမယ်။');if(m==='quiz'){const d=await api('/api/quiz','POST');$('gameBody').innerHTML='<h3>'+d.question.q+'</h3>'+d.question.a.map((a,i)=>'<button class="btn quizOpt" data-i="'+i+'" style="width:100%;margin:5px 0">'+(i+1)+'. '+a+'</button>').join('');document.querySelectorAll('.quizOpt').forEach(b=>b.onclick=async()=>{try{const res=await api('/api/quiz-answer','POST',{choice:Number(b.dataset.i)});$('gameBody').innerHTML='<h3>'+res.message+'</h3>';if(res.account)updateProfile({account:res.account});}catch(e){toast(e.message)}});return}
+ if(m==='spin'){$('gameBody').innerHTML='<div style="font-size:100px;text-align:center;transition:transform 2s" id="wheel">🎡</div><p class="muted">တစ်ကြိမ်လှည့်ပြီး ဆုရယူပါ။</p><button class="btn gold" id="spinNow" style="width:100%">SPIN NOW</button>';$('spinNow').onclick=async()=>{const w=$('wheel');w.style.transform='rotate(1440deg)';try{const d=await api('/api/action/spin','POST');setTimeout(()=>{toast(d.message+' +'+d.coins+' Coin');updateProfile(d)},1900)}catch(e){toast(e.message)}};return}
+ const fish=m==='fish';$('gameBody').innerHTML='<p>'+(fish?'ရေကန်မှာ ငါးမျှားပါ။':'Monster ကို တိုက်ခိုက်ပြီး အနိုင်ယူပါ။')+'</p><div style="font-size:76px;text-align:center" id="actor">'+(fish?'🎣🌊':'👹⚔️')+'</div><p class="muted">'+(fish?'Cast ခလုတ်ကိုနှိပ်ပြီး ငါးဖမ်းပါ။':'Attack ခလုတ်ကိုနှိပ်ပြီး Hunt စတင်ပါ။')+'</p><button class="btn gold" id="doAction" style="width:100%">'+(fish?'CAST LINE':'ATTACK')+'</button>';$('doAction').onclick=async()=>{const a=$('actor');a.style.transform='translateY(-14px) rotate(8deg)';try{const d=await api('/api/action/'+m,'POST');setTimeout(()=>{a.style.transform='';$('gameBody').insertAdjacentHTML('beforeend','<p><b>'+d.message+'</b><br>🪙 +'+d.coins+' Coin · ⭐ +'+(d.xp||5)+' XP</p>');updateProfile(d);$('doAction').disabled=true;$('doAction').textContent='WAIT / TRY LATER'},400)}catch(e){a.style.transform='';toast(e.message)}}}catch(e){$('gameBody').innerHTML='<p>'+e.message+'</p>'}}
+$('menu').onclick=()=>$('menuLayer').classList.remove('hidden');$('closeMenu').onclick=()=>setMode('world');$('backMenu').onclick=()=>{$('gameLayer').classList.add('hidden');$('menuLayer').classList.remove('hidden')};document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+$('action').onclick=()=>{if(mode==='world'){setMode('fish')}else openGame(mode)};$('jump').onclick=()=>{if(player){player.position.y=1;setTimeout(()=>{if(player)player.position.y=0},350)}};
+let joyActive=false;const joy=$('joy'),knob=$('knob');function joyMove(e){const r=joy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=38,len=Math.hypot(dx,dy);if(len>max){dx=dx/len*max;dy=dy/len*max}knob.style.transform='translate('+dx+'px,'+dy+'px)';move={x:dx/max,z:dy/max}}joy.addEventListener('pointerdown',e=>{joyActive=true;joy.setPointerCapture(e.pointerId);joyMove(e)});joy.addEventListener('pointermove',e=>{if(joyActive)joyMove(e)});function joyEnd(){joyActive=false;move={x:0,z:0};knob.style.transform='translate(0,0)'}joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
+(async()=>{try{if(!initData)throw Error('Telegram App ထဲကနေ ဖွင့်ပါ။');if(!chatId)throw Error('Group ID မပါပါ။ /games မှ ပြန်ဖွင့်ပါ။');const d=await api('/api/profile');updateProfile(d);init3D()}catch(e){$('menuLayer').innerHTML='<div class="modal"><h2>Game Connection</h2><p>'+e.message+'</p><p class="muted">Telegram Group ထဲက /games ကိုနှိပ်ပြီး Bot Private Chat မှတစ်ဆင့် Game ဖွင့်ပါ။</p></div>'}})();
+</script></body></html>
