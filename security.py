@@ -59,7 +59,7 @@ def delete_blocked_word(chat_id, word_id):
 
 def _extract_domains(text, entities=None):
     found = set()
-    patterns = re.findall(r"(?i)(?:https?://|www\\.)[^\\s<>]+|(?:t\\.me/|telegram\\.me/)[^\\s<>]+|\\b(?:[a-z0-9-]+\\.)+(?:com|net|org|io|me|xyz|site|online|info|app|dev|gg|co|tv)\\b[^\\s<>]*", text or "")
+    patterns = re.findall(r"(?i)(?:https?://|www\.)[^\s<>]+|(?:t\.me/|telegram\.me/)[^\s<>]+|\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|me|xyz|site|online|info|app|dev|gg|co|tv)\b[^\s<>]*", text or "")
     for raw in patterns:
         parsed = urlparse(raw.rstrip(".,!?)]}") if "://" in raw else "https://" + raw.rstrip(".,!?)]}"))
         host = (parsed.hostname or "").casefold().removeprefix("www.")
@@ -77,7 +77,7 @@ def contains_link(text):
 
 def add_allowed_domain(chat_id, domain):
     value = (domain or "").strip().casefold().removeprefix("https://").removeprefix("http://").removeprefix("www.").split("/")[0].split(":")[0].strip(".")
-    if not value or len(value) > 253 or not re.fullmatch(r"[a-z0-9.-]+\\.[a-z]{2,}", value): return False
+    if not value or len(value) > 253 or not re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", value): return False
     with _db() as c:
         cur = c.execute("INSERT OR IGNORE INTO allowed_link_domains(chat_id,domain) VALUES(?,?)", (chat_id, value))
         return cur.rowcount > 0
