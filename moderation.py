@@ -11,10 +11,11 @@ OWNER_ID = int(getenv("OWNER_ID", "7974865879") or 7974865879)
 
 # Text-only keyword screening. Image/video classification is intentionally not claimed.
 ADULT_PATTERNS = [
-    r"\bporn\b", r"\bxxx\b", r"\bnude(s)?\b", r"\bonlyfans\b",
-    r"\bsex\s*(video|photo|pic|clip)?\b", r"\b18\s*\+\b",
+    r"\bp[o0]rn\b", r"\bxxx\b", r"\bn[uü]de(s)?\b", r"\bonly\s*fans\b",
+    r"\bsex\s*(video|photo|pic|clip)?\b", r"\b18\s*[+＋]\b",
+    r"\b(hentai|erotic|nsfw)\b", r"\b(naked|uncensored)\b",
     r"ညစ်ညမ်း", r"အပြာကား", r"အပြာဗီဒီယို", r"လိင်ပိုင်းဆိုင်ရာ",
-    r"အဝတ်မပါ", r"ကိုယ်လုံးတီး",
+    r"အဝတ်မပါ", r"ကိုယ်လုံးတီး", r"အပြာစာ", r"အပြာပုံ", r"လိင်ဆက်ဆံ",
 ]
 COMPILED_ADULT = [re.compile(p, re.IGNORECASE) for p in ADULT_PATTERNS]
 
@@ -95,7 +96,8 @@ async def moderate_content(update: Update, context: ContextTypes.DEFAULT_TYPE, o
     except TelegramError:
         return
     body = msg.text or msg.caption or ""
-    if not body or not any(pattern.search(body) for pattern in COMPILED_ADULT):
+    normalized = " ".join(body.casefold().replace("0", "o").replace("@", "a").replace("$", "s").split())
+    if not normalized or not any(pattern.search(normalized) for pattern in COMPILED_ADULT):
         return
     try:
         await msg.delete()
