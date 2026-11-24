@@ -4,6 +4,9 @@ import json
 import random
 from rpg import record_game_event
 import time
+from io import BytesIO
+
+from PIL import Image, ImageDraw, ImageFont
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -50,6 +53,42 @@ FISH = [
     ("ငါးကြီး", 20, 35, 13),
     ("ရွှေငါး", 35, 60, 4),
 ]
+
+
+
+def _gold_coin_image():
+    """Create a gold 3D-style coin image for Telegram leaderboard posts."""
+    size = 360
+    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    pixels = image.load()
+    center, radius = size // 2, 145
+    for y in range(size):
+        for x in range(size):
+            dx, dy = x - center, y - center
+            if dx * dx + dy * dy <= radius * radius:
+                shade = max(0, min(1, (center + dx * 0.55 - dy * 0.25) / size))
+                gold = int(170 + shade * 78)
+                pixels[x, y] = (gold, int(gold * 0.69), 25 + int(shade * 12), 255)
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((center-radius, center-radius, center+radius, center+radius),
+                 outline=(255, 231, 130, 255), width=13)
+    draw.ellipse((center-radius+19, center-radius+19, center+radius-19, center+radius-19),
+                 outline=(130, 75, 8, 255), width=8)
+    draw.ellipse((center-radius+31, center-radius+31, center+radius-31, center+radius-31),
+                 outline=(255, 220, 91, 255), width=5)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 142)
+    except OSError:
+        font = ImageFont.load_default()
+    mark = "N"
+    bounds = draw.textbbox((0, 0), mark, font=font, stroke_width=2)
+    tw, th = bounds[2] - bounds[0], bounds[3] - bounds[1]
+    pos = (center - tw // 2, center - th // 2 - bounds[1])
+    draw.text((pos[0] + 5, pos[1] + 8), mark, font=font, fill=(104, 57, 4, 255),
+              stroke_width=7, stroke_fill=(104, 57, 4, 255))
+    draw.text(pos, mark, font=font, fill=(255, 246, 188, 255),
+              stroke_width=3, stroke_fill=(183, 112, 10, 255))
+    return image
 
 
 def init_games():
@@ -492,11 +531,17 @@ async def topcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not rows:
         await update.effective_message.reply_text(_hud_text("🏆 Leaderboard မရှိသေးပါ။"))
         return
-    lines = ["🪙👑 NEXUS RICHEST PLAYERS 👑🪙", "━━━━━━━━━━━━━━━━━━"]
+    lines = ["👑 NEXUS RICHEST PLAYERS 👑", "━━━━━━━━━━━━━━━━━━"]
     medals = ["🥇", "🥈", "🥉", "🏅", "🎖️", "💠", "💎", "🔥", "⚡", "🌟"]
     for i, row in enumerate(rows, 1):
-        lines.append(f"{medals[i-1]} {row['display_name']}\n   🪙 {row['coins']:,} • ⭐ Lv.{_level(row['xp'])}")
-    await update.effective_message.reply_text(_hud_text("\n".join(lines)))
+        lines.append(f"{medals[i-1]} {row['display_name']}\\n   {row['coins']:,} GOLD COINS • ⭐ Lv.{_level(row['xp'])}")
+    caption = _hud_text("\\n".join(lines))
+    coin = _gold_coin_image()
+    photo = BytesIO()
+    coin.save(photo, format="PNG")
+    photo.seek(0)
+    photo.name = "nexus_gold_coin.png"
+    await update.effective_message.reply_photo(photo=photo, caption=caption)
 
 
 async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
