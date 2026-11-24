@@ -4,6 +4,7 @@ from io import BytesIO
 import logging
 import os
 import random
+import re
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -133,6 +134,10 @@ def init_db():
             caption TEXT NOT NULL DEFAULT '',
             priority INTEGER NOT NULL DEFAULT 0,
             hits INTEGER NOT NULL DEFAULT 0,
+            match_type TEXT NOT NULL DEFAULT '',
+            delay_seconds INTEGER NOT NULL DEFAULT 0,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            random_pool TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS usage (
@@ -150,6 +155,10 @@ def init_db():
             ("settings", "goodbye_text", "TEXT NOT NULL DEFAULT '{name} Group မှ ထွက်ခွာသွားပါပြီ။'"),
             ("replies", "priority", "INTEGER NOT NULL DEFAULT 0"),
             ("replies", "hits", "INTEGER NOT NULL DEFAULT 0"),
+            ("replies", "match_type", "TEXT NOT NULL DEFAULT ''"),
+            ("replies", "delay_seconds", "INTEGER NOT NULL DEFAULT 0"),
+            ("replies", "enabled", "INTEGER NOT NULL DEFAULT 1"),
+            ("replies", "random_pool", "TEXT NOT NULL DEFAULT ''"),
         ]:
             columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
             if column not in columns:
@@ -671,6 +680,75 @@ async def add_reply(update, context):
     await msg.reply_text("✅ Reply ထည့်ပြီးပါပြီ။ ID: " + str(cur.lastrowid))
 
 
+async def add_random_reply(update, context):
+    if not await require_admin(update, context):
+        return
+    raw = update.effective_message.text.partition(" ")[2].strip()
+    if "|" not in raw:
+        await update.effective_message.reply_text("Usage: /addrandom keyword | reply one || reply two")
+        return
+    keyword, pool = (part.strip() for part in raw.split("|", 1))
+    variants = [part.strip() for part in pool.split("||") if part.strip()]
+    if not keyword or len(variants) < 2 or len(variants) > 20 or any(len(x) > 3500 for x in variants):
+        await update.effective_message.reply_text("Keyword ထည့်ပြီး Reply ၂ ခုမှ ၂၀ ခုအထိ ထည့်ပါ။")
+        return
+    with db() as conn:
+        cur = conn.execute("INSERT INTO replies(chat_id,keyword,response,random_pool) VALUES(?,?,?,?)",
+                           (update.effective_chat.id, keyword, variants[0], "|||".join(variants)))
+    await update.effective_message.reply_text(f"🎲 Random Reply သိမ်းပြီးပါပြီ။ ID: {cur.lastrowid}")
+
+
+async def add_default_reply(update, context):
+    if not await require_admin(update, context):
+        return
+    response = update.effective_message.text.partition(" ")[2].strip()
+    if not response:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /adddefault မသိတဲ့စာအတွက် ပြန်မယ့်စာ")
+        return
+    with db() as conn:
+        cur = conn.execute("INSERT INTO replies(chat_id,keyword,response,match_type) VALUES(?,?,?,'default')",
+                           (update.effective_chat.id, "*", response[:3500]))
+    await update.effective_message.reply_text(f"🌐 Default Reply ထည့်ပြီးပါပြီ။ ID: {cur.lastrowid}")
+
+
+async def set_reply_mode(update, context):
+    if not await require_admin(update, context):
+        return
+    modes = {"exact", "contains", "startswith", "regex"}
+    if len(context.args) != 2 or not context.args[0].isdigit() or context.args[1].lower() not in modes:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /setreplymode ID exact|contains|startswith|regex")
+        return
+    with db() as conn:
+        cur = conn.execute("UPDATE replies SET match_type=? WHERE id=? AND chat_id=?",
+                           (context.args[1].lower(), int(context.args[0]), update.effective_chat.id))
+    await update.effective_message.reply_text("✅ Match Mode ပြောင်းပြီးပါပြီ။" if cur.rowcount else "ဒီ ID ကို မတွေ့ပါဘူး။")
+
+
+async def set_reply_delay(update, context):
+    if not await require_admin(update, context):
+        return
+    if len(context.args) != 2 or not context.args[0].isdigit() or not context.args[1].isdigit() or not 0 <= int(context.args[1]) <= 60:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /setdelay ID စက္ကန့် (0-60)")
+        return
+    with db() as conn:
+        cur = conn.execute("UPDATE replies SET delay_seconds=? WHERE id=? AND chat_id=?",
+                           (int(context.args[1]), int(context.args[0]), update.effective_chat.id))
+    await update.effective_message.reply_text("⏱️ Delay ပြောင်းပြီးပါပြီ။" if cur.rowcount else "ဒီ ID ကို မတွေ့ပါဘူး။")
+
+
+async def toggle_one_reply(update, context):
+    if not await require_admin(update, context):
+        return
+    if len(context.args) != 2 or not context.args[0].isdigit() or context.args[1].lower() not in {"on", "off"}:
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /replytoggle ID on|off")
+        return
+    enabled = int(context.args[1].lower() == "on")
+    with db() as conn:
+        cur = conn.execute("UPDATE replies SET enabled=? WHERE id=? AND chat_id=?",
+                           (enabled, int(context.args[0]), update.effective_chat.id))
+    await update.effective_message.reply_text(("🟢 Reply ဖွင့်ပြီးပါပြီ။" if enabled else "🔴 Reply ပိတ်ပြီးပါပြီ။") if cur.rowcount else "ဒီ ID ကို မတွေ့ပါဘူး။")
+
+
 async def edit_reply(update, context):
     if not await require_admin(update, context):
         return
@@ -738,7 +816,7 @@ async def toggle(update, context):
 async def set_mode(update, context):
     if not await require_admin(update, context):
         return
-    modes = {"exact", "contains", "startswith"}
+    modes = {"exact", "contains", "startswith", "regex"}
     if not context.args or context.args[0].lower() not in modes:
         await update.effective_message.reply_text("အသုံးပြုပုံ: /setmode exact|contains|startswith")
         return
@@ -1583,34 +1661,53 @@ async def handle_text(update, context):
         last = conn.execute("SELECT last_reply FROM usage WHERE chat_id=? AND user_id=?", (chat.id, user.id)).fetchone()
         if last and now - last["last_reply"] < s["cooldown"]:
             return
-        rows = conn.execute("SELECT * FROM replies WHERE chat_id=? ORDER BY priority DESC,id DESC", (chat.id,)).fetchall()
+        rows = conn.execute("SELECT * FROM replies WHERE chat_id=? AND enabled=1 ORDER BY priority DESC,id DESC", (chat.id,)).fetchall()
     group_cd = int(s.get("group_cooldown", 0))
     if group_cd and now - GROUP_LAST_REPLY[chat.id] < group_cd:
         return
     incoming = " ".join(msg.text.casefold().split())
     matches = []
+    default_row = None
     for row in rows:
+        mode = row["match_type"] or s["match_mode"]
+        if mode == "default":
+            if default_row is None:
+                default_row = row
+            continue
         key = " ".join(row["keyword"].casefold().split())
         if not key:
             continue
-        mode = s["match_mode"]
-        if mode == "exact":
-            matched = incoming == key
-            score = 10000 + len(key) if matched else -1
-        elif mode == "startswith":
-            matched = incoming.startswith(key)
-            score = 5000 + len(key) if matched else -1
-        else:
-            # Whole phrase matching prevents short fragments matching inside unrelated words.
-            matched = key in incoming
-            score = 1000 + len(key) if matched else -1
+        try:
+            if mode == "exact":
+                matched = incoming == key
+                score = 10000 + len(key) if matched else -1
+            elif mode == "startswith":
+                matched = incoming.startswith(key)
+                score = 5000 + len(key) if matched else -1
+            elif mode == "regex":
+                matched = bool(re.search(row["keyword"], msg.text, flags=re.IGNORECASE))
+                score = 7000 + len(key) if matched else -1
+            else:
+                matched = key in incoming
+                score = 1000 + len(key) if matched else -1
+        except re.error:
+            logger.warning("Invalid regex in reply ID %s", row["id"])
+            continue
         if matched:
             matches.append((int(row["priority"]), score, -int(row["id"]), row))
-    if not matches:
+    selected = max(matches, key=lambda item: item[:3])[3] if matches else default_row
+    if not selected:
         return
-    # Highest priority first; then strongest/most specific keyword; stable ID breaks ties.
-    selected = max(matches, key=lambda item: item[:3])[3]
     try:
+        pool = selected["random_pool"] or ""
+        if pool:
+            choices = [item for item in pool.split("|||") if item]
+            if choices:
+                selected = dict(selected)
+                selected["response"] = random.choice(choices)
+        delay = min(60, max(0, int(selected["delay_seconds"] or 0)))
+        if delay:
+            await asyncio.sleep(delay)
         await send_reply(msg, selected)
         GROUP_LAST_REPLY[chat.id] = now
         with db() as conn:
@@ -1990,6 +2087,11 @@ def main():
     app.add_handler(CommandHandler("game", game_toggle))
     app.add_handler(CommandHandler("panel", panel))
     app.add_handler(CommandHandler("addreply", add_reply))
+    app.add_handler(CommandHandler("addrandom", add_random_reply))
+    app.add_handler(CommandHandler("adddefault", add_default_reply))
+    app.add_handler(CommandHandler("setreplymode", set_reply_mode))
+    app.add_handler(CommandHandler("setdelay", set_reply_delay))
+    app.add_handler(CommandHandler("replytoggle", toggle_one_reply))
     app.add_handler(CommandHandler("editreply", edit_reply))
     app.add_handler(CommandHandler("delreply", delete_reply))
     app.add_handler(CommandHandler("listreplies", list_replies))
