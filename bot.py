@@ -1515,7 +1515,7 @@ async def handle_text(update, context):
         and msg.reply_to_message.from_user
         and context.bot.id == msg.reply_to_message.from_user.id
     )
-    smart_reply = smart_conversation_reply(msg.text)
+    smart_reply = smart_conversation_reply(msg.text) if s["enabled"] else None
     if replied_to_bot and not smart_reply:
         smart_reply = "ဟုတ်ကဲ့ရှင် 💗 မြအေး နားထောင်နေပါတယ်။ ဆက်ပြောပါနော်။"
     if smart_reply:
@@ -1526,7 +1526,7 @@ async def handle_text(update, context):
             SMART_CHAT_LAST_REPLY[chat.id] = now
             SMART_USER_LAST_REPLY[(chat.id, user.id)] = now
             return
-    elif len(msg.text.strip()) >= 12 and random.random() < 0.02:
+    elif s["enabled"] and len(msg.text.strip()) >= 12 and random.random() < 0.02:
         # Very occasional friendly presence, with a longer group-wide cooldown.
         if now - SMART_CHAT_LAST_REPLY[chat.id] >= 180:
             await msg.reply_text(
