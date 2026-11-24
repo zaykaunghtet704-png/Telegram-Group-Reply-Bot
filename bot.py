@@ -696,19 +696,6 @@ async def add_random_reply(update, context):
     await update.effective_message.reply_text(f"🎲 Random Reply သိမ်းပြီးပါပြီ။ ID: {cur.lastrowid}")
 
 
-async def add_default_reply(update, context):
-    if not await require_admin(update, context):
-        return
-    response = update.effective_message.text.partition(" ")[2].strip()
-    if not response:
-        await update.effective_message.reply_text("အသုံးပြုပုံ: /adddefault မသိတဲ့စာအတွက် ပြန်မယ့်စာ")
-        return
-    with db() as conn:
-        cur = conn.execute("INSERT INTO replies(chat_id,keyword,response,match_type) VALUES(?,?,?,'default')",
-                           (update.effective_chat.id, "*", response[:3500]))
-    await update.effective_message.reply_text(f"🌐 Default Reply ထည့်ပြီးပါပြီ။ ID: {cur.lastrowid}")
-
-
 async def set_reply_mode(update, context):
     if not await require_admin(update, context):
         return
@@ -2043,7 +2030,6 @@ def main():
     app.add_handler(CommandHandler("panel", panel))
     app.add_handler(CommandHandler("addreply", add_reply))
     app.add_handler(CommandHandler("addrandom", add_random_reply))
-    app.add_handler(CommandHandler("adddefault", add_default_reply))
     app.add_handler(CommandHandler("setreplymode", set_reply_mode))
     app.add_handler(CommandHandler("replytoggle", toggle_one_reply))
     app.add_handler(CommandHandler("editreply", edit_reply))
