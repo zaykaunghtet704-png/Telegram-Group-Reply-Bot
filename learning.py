@@ -25,6 +25,13 @@ def init_learning_db():
             chat_id BIGINT PRIMARY KEY, user_id BIGINT NOT NULL,
             message_text TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL
         )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS learn_messages (
+            chat_id BIGINT NOT NULL, message_id BIGINT NOT NULL,
+            user_id BIGINT NOT NULL, message_text TEXT NOT NULL,
+            created_at DOUBLE PRECISION NOT NULL,
+            PRIMARY KEY(chat_id,message_id)
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_learn_messages_time ON learn_messages(chat_id,created_at)")
         conn.execute("ALTER TABLE learning_settings ALTER COLUMN enabled SET DEFAULT 1")
         conn.execute("UPDATE learning_settings SET enabled=1 WHERE enabled<>1")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_learned_chat ON learned_pairs(chat_id)")
@@ -67,28 +74,48 @@ def _enforce_limits(conn, chat_id):
         conn.execute("DELETE FROM learned_pairs WHERE id IN (SELECT id FROM learned_pairs ORDER BY hits ASC,id ASC LIMIT ?)", (excess,))
 
 
-def record_conversation(chat_id, user_id, message_text, reply_to_user_id=None):
+def record_conversation(chat_id, user_id, message_id, message_text, reply_to_message_id=None):
+    """Learn from explicit Telegram replies between different group members."""
     text = (message_text or "").strip()
-    if len(text) < 3 or len(text) > MAX_MESSAGE_LENGTH:
+    if len(text) < 3 or len(text) > MAX_MESSAGE_LENGTH or not message_id:
         return
     now = time.time()
     with _db() as conn:
-        previous = conn.execute("SELECT user_id,message_text,created_at FROM learn_pending WHERE chat_id=?", (chat_id,)).fetchone()
-        if (previous and reply_to_user_id is not None and previous["user_id"] == reply_to_user_id
-                and previous["user_id"] != user_id and now - float(previous["created_at"]) <= 300):
-            prompt = previous["message_text"].strip()
-            if len(prompt) >= 3 and normalize_text(prompt) != normalize_text(text):
-                existing = conn.execute("SELECT id FROM learned_pairs WHERE chat_id=? AND prompt=? AND response=? ORDER BY id DESC LIMIT 1",
-                                        (chat_id, prompt[:MAX_MESSAGE_LENGTH], text[:MAX_MESSAGE_LENGTH])).fetchone()
-                if existing:
-                    conn.execute("UPDATE learned_pairs SET hits=hits+1 WHERE id=?", (existing["id"],))
-                else:
-                    conn.execute("INSERT INTO learned_pairs(chat_id,prompt,response) VALUES(?,?,?)",
-                                 (chat_id, prompt[:MAX_MESSAGE_LENGTH], text[:MAX_MESSAGE_LENGTH]))
-                _enforce_limits(conn, chat_id)
-        conn.execute("INSERT INTO learn_pending(chat_id,user_id,message_text,created_at) VALUES(?,?,?,?) "
-                     "ON CONFLICT(chat_id) DO UPDATE SET user_id=excluded.user_id,message_text=excluded.message_text,created_at=excluded.created_at",
-                     (chat_id, user_id, text[:MAX_MESSAGE_LENGTH], now))
+        if reply_to_message_id:
+            previous = conn.execute(
+                "SELECT user_id,message_text,created_at FROM learn_messages WHERE chat_id=? AND message_id=?",
+                (chat_id, reply_to_message_id),
+            ).fetchone()
+            if previous and previous["user_id"] != user_id and now - float(previous["created_at"]) <= 86400:
+                prompt = previous["message_text"].strip()
+                if len(prompt) >= 3 and normalize_text(prompt) != normalize_text(text):
+                    existing = conn.execute(
+                        "SELECT id FROM learned_pairs WHERE chat_id=? AND prompt=? AND response=? ORDER BY id DESC LIMIT 1",
+                        (chat_id, prompt[:MAX_MESSAGE_LENGTH], text[:MAX_MESSAGE_LENGTH]),
+                    ).fetchone()
+                    if existing:
+                        conn.execute("UPDATE learned_pairs SET hits=hits+1 WHERE id=?", (existing["id"],))
+                    else:
+                        conn.execute(
+                            "INSERT INTO learned_pairs(chat_id,prompt,response) VALUES(?,?,?)",
+                            (chat_id, prompt[:MAX_MESSAGE_LENGTH], text[:MAX_MESSAGE_LENGTH]),
+                        )
+                    _enforce_limits(conn, chat_id)
+
+        conn.execute(
+            "INSERT INTO learn_messages(chat_id,message_id,user_id,message_text,created_at) VALUES(?,?,?,?,?) "
+            "ON CONFLICT(chat_id,message_id) DO NOTHING",
+            (chat_id, message_id, user_id, text[:MAX_MESSAGE_LENGTH], now),
+        )
+        # Keep only the latest 10,000 source messages per group.
+        conn.execute(
+            "DELETE FROM learn_messages WHERE (chat_id,message_id) IN "
+            "(SELECT chat_id,message_id FROM learn_messages WHERE chat_id=? "
+            "ORDER BY created_at DESC,message_id DESC OFFSET 10000)",
+            (chat_id,),
+        )
+        # Source messages expire after 24 hours; learned patterns remain.
+        conn.execute("DELETE FROM learn_messages WHERE created_at < ?", (now - 86400,))
 
 
 def find_learned_reply(chat_id, incoming, threshold):
