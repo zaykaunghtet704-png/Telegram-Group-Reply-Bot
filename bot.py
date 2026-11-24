@@ -37,7 +37,7 @@ from rpg_expansion import (init_rpg_expansion, guild_create_command, guild_join_
 from rpg_ui import rpg_menu_callback
 from rpg_ultimate import (init_rpg_ultimate, rpg_ultimate_callback, ultimate_menu_command, dungeon_command, summon_command, heroes_command, treasure_command)
 from games import (
-    init_games, set_games_enabled, game_help, balance, rank, toprank, daily, topcoins,
+    init_games, set_games_enabled, games_enabled, game_help, balance, rank, toprank, daily, topcoins,
     quiz, answer, fish, hunt, mines, mine_callback, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
     addcoins, takecoins,
 )
