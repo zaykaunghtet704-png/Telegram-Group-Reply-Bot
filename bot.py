@@ -1091,7 +1091,7 @@ async def reply_settings(update, context):
         + "Cooldown: " + str(s["cooldown"]) + " sec\n"
         + "Match: " + s["match_mode"] + "\n"
         + "Language: " + s["language"] + "\n"
-        + "Learning: ALWAYS ON 🧠\\n"
+        + "Learning: ALWAYS ON 🧠\n"
         + "Learning threshold: " + str(get_learning_settings(update.effective_chat.id)["threshold"]) + "%"
     )
 
@@ -1575,8 +1575,10 @@ async def handle_text(update, context):
         # Keep learning even when automatic replies are switched off.
         replied_user = msg.reply_to_message.from_user if msg.reply_to_message else None
         if not msg.text.startswith("/"):
-            record_conversation(chat.id, user.id, msg.text,
-                                reply_to_user_id=(replied_user.id if replied_user else None))
+            record_conversation(
+                chat.id, user.id, msg.message_id, msg.text,
+                reply_to_message_id=(msg.reply_to_message.message_id if msg.reply_to_message else None),
+            )
         learned = find_learned_reply(chat.id, msg.text, learning["threshold"]) if s["enabled"] else None
         if learned and s["enabled"] and random.randint(1, 100) <= s["chance"]:
             await msg.reply_text(learned["response"], reply_to_message_id=msg.message_id)
