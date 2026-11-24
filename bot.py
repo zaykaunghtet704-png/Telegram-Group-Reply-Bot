@@ -539,7 +539,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/lovechannel add|remove|list — Owner channel settings\n"
             "/lovereports — Owner report review\n\n"
             "🧠 LEARNING & OWNER\n"
-            "/learn on|off /learned /forgetlearned ID\n"
+            "/learned /forgetlearned ID\n"
             "/setlearnthreshold 50-95 — Similarity threshold\n"
             "/owner — Owner panel\n"
             "/ownerban USER_ID reason /ownerunban USER_ID\n"
@@ -585,7 +585,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/setgoodbyetext စာသား — Goodbye စာသားပြင်ရန်\n"
         "/welcomepreview / /goodbyepreview — Preview ကြည့်ရန်\n"
         "/resetwelcome / /resetgoodbye — မူလစာသားပြန်ထားရန်\n"
-        "/learn on|off — Group စကားမှ သင်ယူမှု ဖွင့်/ပိတ်ရန်\n"
+        "🧠 Always-On Learning — Group စကားဝိုင်းမှ အလိုအလျောက် သင်ယူရန်\n"
         "/security on|off — Group Security ဖွင့်/ပိတ်ရန်\n"
         "/antilink on|off — Link ဖျက်ခြင်း\n"
         "/antispam on|off — ထပ်ခါထပ်ခါစာ ဖျက်ခြင်း\n"
@@ -1091,7 +1091,7 @@ async def reply_settings(update, context):
         + "Cooldown: " + str(s["cooldown"]) + " sec\n"
         + "Match: " + s["match_mode"] + "\n"
         + "Language: " + s["language"] + "\n"
-        + "Learning: " + ("ON" if get_learning_settings(update.effective_chat.id)["enabled"] else "OFF") + "\n"
+        + "Learning: ALWAYS ON 🧠\\n"
         + "Learning threshold: " + str(get_learning_settings(update.effective_chat.id)["threshold"]) + "%"
     )
 
@@ -1308,24 +1308,12 @@ async def automatic_backup(context):
 
 
 
-async def set_learning(update, context):
-    if not await require_admin(update, context):
-        return
-    if not context.args or context.args[0].lower() not in ("on", "off"):
-        await update.effective_message.reply_text("အသုံးပြုပုံ: /learn on သို့မဟုတ် /learn off")
-        return
-    enabled = int(context.args[0].lower() == "on")
-    set_learning_setting(update.effective_chat.id, "enabled", enabled)
-    message = "🧠 Learning ON ဖြစ်ပါပြီ။ Group ထဲက လူနှစ်ယောက် ဆက်တိုက်ပြောဆိုတဲ့ စကားတွေကို မေးခွန်း/အဖြေ စကားတွဲအဖြစ် မှတ်သားပါမယ်။ Group အဖွဲ့ဝင်များကို အသိပေးထားပါ။" if enabled else "🧠 Learning OFF ဖြစ်ပါပြီ။ သိမ်းထားပြီးသား စကားတွဲများ မပျက်ပါ။"
-    await update.effective_message.reply_text(message)
-
-
 async def learned_list_command(update, context):
     if not await require_admin(update, context):
         return
     total, rows = list_learned(update.effective_chat.id)
     if not rows:
-        await update.effective_message.reply_text("🧠 သင်ယူထားသော စကားတွဲ မရှိသေးပါ။ /learn on ဖြင့် စတင်ပါ။")
+        await update.effective_message.reply_text("🧠 သင်ယူထားသော စကားတွဲ မရှိသေးပါ။ အဖွဲ့ဝင်များက တစ်ဦး၏စာကို တစ်ဦး Reply ပြန်သည့်အခါ အလိုအလျောက် သင်ယူပါမယ်။")
         return
     lines = [f"🧠 သင်ယူထားသော စကားတွဲ ({total} ခု၊ နောက်ဆုံး 30 ခု)"]
     for row in rows:
@@ -1559,8 +1547,7 @@ async def handle_text(update, context):
     s = get_settings(chat.id)
     now = time.time()
 
-    # Smart conversation works independently from /autoreply and /learn.
-    # It is intentionally stateless: ordinary group messages are not saved.
+    # Smart conversation is separate from the always-on learning memory.
     replied_to_bot = bool(
         msg.reply_to_message
         and msg.reply_to_message.from_user
@@ -1584,27 +1571,24 @@ async def handle_text(update, context):
         if len(queue) > limit:
             return
     learning = get_learning_settings(chat.id)
-    if learning["enabled"]:
-        try:
-            learned = find_learned_reply(chat.id, msg.text, learning["threshold"])
-            if learned and s["enabled"] and random.randint(1, 100) <= s["chance"]:
-                await msg.reply_text(learned["response"], reply_to_message_id=msg.message_id)
-                with db() as conn:
-                    conn.execute("UPDATE learned_pairs SET hits=hits+1 WHERE id=?", (learned["id"],))
-                    conn.execute(
-                        "INSERT INTO usage(chat_id,user_id,last_reply) VALUES(?,?,?) "
-                        "ON CONFLICT(chat_id,user_id) DO UPDATE SET last_reply=excluded.last_reply",
-                        (chat.id, user.id, now),
-                    )
-                clear_pending(chat.id)
-                return
-            replied_user = msg.reply_to_message.from_user if msg.reply_to_message else None
-            record_conversation(
-                chat.id, user.id, msg.text,
-                reply_to_user_id=(replied_user.id if replied_user else None),
-            )
-        except Exception:
-            logger.exception("Conversation learning failed")
+    try:
+        # Keep learning even when automatic replies are switched off.
+        replied_user = msg.reply_to_message.from_user if msg.reply_to_message else None
+        if not msg.text.startswith("/"):
+            record_conversation(chat.id, user.id, msg.text,
+                                reply_to_user_id=(replied_user.id if replied_user else None))
+        learned = find_learned_reply(chat.id, msg.text, learning["threshold"]) if s["enabled"] else None
+        if learned and s["enabled"] and random.randint(1, 100) <= s["chance"]:
+            await msg.reply_text(learned["response"], reply_to_message_id=msg.message_id)
+            with db() as conn:
+                conn.execute("UPDATE learned_pairs SET hits=hits+1 WHERE id=?", (learned["id"],))
+                conn.execute("INSERT INTO usage(chat_id,user_id,last_reply) VALUES(?,?,?) "
+                             "ON CONFLICT(chat_id,user_id) DO UPDATE SET last_reply=excluded.last_reply",
+                             (chat.id, user.id, now))
+            clear_pending(chat.id)
+            return
+    except Exception:
+        logger.exception("Always-on conversation learning failed")
     if not s["enabled"]:
         return
     with db() as conn:
@@ -1895,7 +1879,6 @@ async def post_init(app):
         ("addfilterword", "Add blocked phrase"),
         ("listfilterwords", "List blocked phrases"),
         ("delfilterword", "Delete blocked phrase"),
-        ("learn", "Toggle conversation learning"),
         ("learned", "List learned conversations"),
         ("forgetlearned", "Delete learned pair"),
         ("setlearnthreshold", "Set learning similarity"),
@@ -2067,8 +2050,7 @@ def main():
     app.add_handler(CommandHandler("addfilterword", add_filter_word_command))
     app.add_handler(CommandHandler("listfilterwords", list_filter_words_command))
     app.add_handler(CommandHandler("delfilterword", delete_filter_word_command))
-    app.add_handler(CommandHandler("learn", set_learning))
-    app.add_handler(CommandHandler("learned", learned_list_command))
+        app.add_handler(CommandHandler("learned", learned_list_command))
     app.add_handler(CommandHandler("forgetlearned", forget_learned_command))
     app.add_handler(CommandHandler("setlearnthreshold", set_learn_threshold))
     app.add_handler(CommandHandler("replysettings", reply_settings))
