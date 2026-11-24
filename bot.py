@@ -135,7 +135,6 @@ def init_db():
             priority INTEGER NOT NULL DEFAULT 0,
             hits INTEGER NOT NULL DEFAULT 0,
             match_type TEXT NOT NULL DEFAULT '',
-            delay_seconds INTEGER NOT NULL DEFAULT 0,
             enabled INTEGER NOT NULL DEFAULT 1,
             random_pool TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -156,7 +155,6 @@ def init_db():
             ("replies", "priority", "INTEGER NOT NULL DEFAULT 0"),
             ("replies", "hits", "INTEGER NOT NULL DEFAULT 0"),
             ("replies", "match_type", "TEXT NOT NULL DEFAULT ''"),
-            ("replies", "delay_seconds", "INTEGER NOT NULL DEFAULT 0"),
             ("replies", "enabled", "INTEGER NOT NULL DEFAULT 1"),
             ("replies", "random_pool", "TEXT NOT NULL DEFAULT ''"),
         ]:
@@ -722,18 +720,6 @@ async def set_reply_mode(update, context):
         cur = conn.execute("UPDATE replies SET match_type=? WHERE id=? AND chat_id=?",
                            (context.args[1].lower(), int(context.args[0]), update.effective_chat.id))
     await update.effective_message.reply_text("✅ Match Mode ပြောင်းပြီးပါပြီ။" if cur.rowcount else "ဒီ ID ကို မတွေ့ပါဘူး။")
-
-
-async def set_reply_delay(update, context):
-    if not await require_admin(update, context):
-        return
-    if len(context.args) != 2 or not context.args[0].isdigit() or not context.args[1].isdigit() or not 0 <= int(context.args[1]) <= 60:
-        await update.effective_message.reply_text("အသုံးပြုပုံ: /setdelay ID စက္ကန့် (0-60)")
-        return
-    with db() as conn:
-        cur = conn.execute("UPDATE replies SET delay_seconds=? WHERE id=? AND chat_id=?",
-                           (int(context.args[1]), int(context.args[0]), update.effective_chat.id))
-    await update.effective_message.reply_text("⏱️ Delay ပြောင်းပြီးပါပြီ။" if cur.rowcount else "ဒီ ID ကို မတွေ့ပါဘူး။")
 
 
 async def toggle_one_reply(update, context):
@@ -1604,19 +1590,6 @@ async def handle_text(update, context):
             SMART_CHAT_LAST_REPLY[chat.id] = now
             SMART_USER_LAST_REPLY[(chat.id, user.id)] = now
             return
-    elif s["enabled"] and len(msg.text.strip()) >= 12 and random.random() < 0.02:
-        # Very occasional friendly presence, with a longer group-wide cooldown.
-        if now - SMART_CHAT_LAST_REPLY[chat.id] >= 180:
-            await msg.reply_text(
-                random.choice([
-                    "ဒီ Group မှာ စကားဝိုင်းလေးက စည်ကားနေတာပဲ 😄",
-                    "အားလုံး စကားပြောလို့ရပါတယ်နော်။ မြအေး ဒီမှာရှိတယ် 💗",
-                ]),
-                reply_to_message_id=msg.message_id,
-            )
-            SMART_CHAT_LAST_REPLY[chat.id] = now
-            SMART_USER_LAST_REPLY[(chat.id, user.id)] = now
-            return
 
     limit = int(s.get("flood_limit", 0))
     if s["enabled"] and limit:
@@ -1655,12 +1628,10 @@ async def handle_text(update, context):
             )
         except Exception:
             logger.exception("Conversation learning failed")
-    if not s["enabled"] or random.randint(1, 100) > s["chance"]:
+    if not s["enabled"]:
         return
     with db() as conn:
-        last = conn.execute("SELECT last_reply FROM usage WHERE chat_id=? AND user_id=?", (chat.id, user.id)).fetchone()
-        if last and now - last["last_reply"] < s["cooldown"]:
-            return
+        # Check every member independently; keyword replies have no per-user cooldown.
         rows = conn.execute("SELECT * FROM replies WHERE chat_id=? AND enabled=1 ORDER BY priority DESC,id DESC", (chat.id,)).fetchall()
     group_cd = int(s.get("group_cooldown", 0))
     if group_cd and now - GROUP_LAST_REPLY[chat.id] < group_cd:
@@ -1695,7 +1666,7 @@ async def handle_text(update, context):
             continue
         if matched:
             matches.append((int(row["priority"]), score, -int(row["id"]), row))
-    selected = max(matches, key=lambda item: item[:3])[3] if matches else default_row
+    selected = max(matches, key=lambda item: item[:3])[3] if matches else None
     if not selected:
         return
     try:
@@ -1705,9 +1676,6 @@ async def handle_text(update, context):
             if choices:
                 selected = dict(selected)
                 selected["response"] = random.choice(choices)
-        delay = min(60, max(0, int(selected["delay_seconds"] or 0)))
-        if delay:
-            await asyncio.sleep(delay)
         await send_reply(msg, selected)
         GROUP_LAST_REPLY[chat.id] = now
         with db() as conn:
@@ -2090,7 +2058,6 @@ def main():
     app.add_handler(CommandHandler("addrandom", add_random_reply))
     app.add_handler(CommandHandler("adddefault", add_default_reply))
     app.add_handler(CommandHandler("setreplymode", set_reply_mode))
-    app.add_handler(CommandHandler("setdelay", set_reply_delay))
     app.add_handler(CommandHandler("replytoggle", toggle_one_reply))
     app.add_handler(CommandHandler("editreply", edit_reply))
     app.add_handler(CommandHandler("delreply", delete_reply))
