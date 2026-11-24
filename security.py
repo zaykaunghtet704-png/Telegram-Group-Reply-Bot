@@ -1,10 +1,12 @@
 import re
 import time
+from urllib.parse import urlparse
 from collections import defaultdict, deque
 from database import connect as _db
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 SPAM_WINDOW = defaultdict(deque)
+FLOOD_WINDOW = defaultdict(deque)
 
 def init_security_db():
     with _db() as c:
@@ -25,6 +27,7 @@ def init_security_db():
             action TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
             created_at REAL NOT NULL)""")
         c.execute("CREATE INDEX IF NOT EXISTS idx_raid_actor ON raid_actions(chat_id,actor_id,created_at)")
+        c.execute("""CREATE TABLE IF NOT EXISTS allowed_link_domains(chat_id INTEGER NOT NULL, domain TEXT NOT NULL, PRIMARY KEY(chat_id,domain))""")
 
 def get_security(chat_id):
     with _db() as c:
@@ -54,72 +57,94 @@ def delete_blocked_word(chat_id, word_id):
         cur = c.execute("DELETE FROM blocked_words WHERE chat_id=? AND id=?",(chat_id,word_id))
         return cur.rowcount > 0
 
+def _extract_domains(text, entities=None):
+    found = set()
+    patterns = re.findall(r"(?i)(?:https?://|www\\.)[^\\s<>]+|(?:t\\.me/|telegram\\.me/)[^\\s<>]+|\\b(?:[a-z0-9-]+\\.)+(?:com|net|org|io|me|xyz|site|online|info|app|dev|gg|co|tv)\\b[^\\s<>]*", text or "")
+    for raw in patterns:
+        parsed = urlparse(raw.rstrip(".,!?)]}") if "://" in raw else "https://" + raw.rstrip(".,!?)]}"))
+        host = (parsed.hostname or "").casefold().removeprefix("www.")
+        if host: found.add(host)
+    for entity in entities or []:
+        url = getattr(entity, "url", None)
+        if url:
+            parsed = urlparse(url if "://" in url else "https://" + url)
+            host = (parsed.hostname or "").casefold().removeprefix("www.")
+            if host: found.add(host)
+    return found
+
 def contains_link(text):
-    if not text:
-        return False
-    lowered = text.casefold()
-    markers = ("http://", "https://", "www.", "t.me/", "telegram.me/")
-    if any(marker in lowered for marker in markers):
-        return True
-    endings = (".com", ".net", ".org", ".io", ".me", ".xyz", ".site", ".online", ".info")
-    return any(token.rstrip(".,!?)]}") .endswith(endings) for token in lowered.split())
+    return bool(_extract_domains(text))
+
+def add_allowed_domain(chat_id, domain):
+    value = (domain or "").strip().casefold().removeprefix("https://").removeprefix("http://").removeprefix("www.").split("/")[0].split(":")[0].strip(".")
+    if not value or len(value) > 253 or not re.fullmatch(r"[a-z0-9.-]+\\.[a-z]{2,}", value): return False
+    with _db() as c:
+        cur = c.execute("INSERT OR IGNORE INTO allowed_link_domains(chat_id,domain) VALUES(?,?)", (chat_id, value))
+        return cur.rowcount > 0
+
+def list_allowed_domains(chat_id):
+    with _db() as c:
+        return [row["domain"] for row in c.execute("SELECT domain FROM allowed_link_domains WHERE chat_id=? ORDER BY domain", (chat_id,)).fetchall()]
+
+def delete_allowed_domain(chat_id, domain):
+    value = (domain or "").strip().casefold().removeprefix("www.")
+    with _db() as c:
+        cur = c.execute("DELETE FROM allowed_link_domains WHERE chat_id=? AND domain=?", (chat_id, value))
+        return cur.rowcount > 0
+
+def _domain_allowed(domain, allowlist):
+    return any(domain == allowed or domain.endswith("." + allowed) for allowed in allowlist)
 
 def is_admin_member(member):
     return member.status in ("administrator", "creator")
 
 async def moderate_message(update, context, owner_id):
-    msg=update.effective_message
-    chat=update.effective_chat
-    user=update.effective_user
-    if not msg or not chat or chat.type not in ("group","supergroup") or not user or user.is_bot or (owner_id and user.id == owner_id):
-        return
-    cfg=get_security(chat.id)
+    msg, chat, user = update.effective_message, update.effective_chat, update.effective_user
+    if not msg or not chat or chat.type not in ("group", "supergroup") or not user or user.is_bot or (owner_id and user.id == owner_id): return
+    cfg = get_security(chat.id)
     if not cfg["enabled"]: return
     try:
-        member=await context.bot.get_chat_member(chat.id,user.id)
+        member = await context.bot.get_chat_member(chat.id, user.id)
         if is_admin_member(member): return
-    except Exception:
-        return
-    text=msg.text or msg.caption or ""
-    reason=None
-    entities=(msg.entities or []) + (msg.caption_entities or [])
-    hidden_link=any(getattr(entity,"type","") in ("url","text_link") or getattr(entity,"url",None) for entity in entities)
-    if cfg["anti_link"] and (contains_link(text) or hidden_link):
-        reason="Link ခွင့်မပြုပါ"
-    if text:
+    except Exception: return
+    body = msg.text or msg.caption or ""
+    entities = list(msg.entities or []) + list(msg.caption_entities or [])
+    reason = None
+    if cfg["anti_link"]:
+        allowed = list_allowed_domains(chat.id)
+        blocked = sorted(d for d in _extract_domains(body, entities) if not _domain_allowed(d, allowed))
+        if blocked: reason = "ခွင့်မပြုထားသော Link (" + blocked[0] + ")"
+    if not reason and body:
         with _db() as c:
-            words=[row["word"] for row in c.execute("SELECT word FROM blocked_words WHERE chat_id=?",(chat.id,)).fetchall()]
-        matched=next((word for word in words if word and word in text.casefold()),None)
-        if matched: reason="ခွင့်မပြုထားသော စာသား ပါဝင်နေပါသည်"
-    if cfg["anti_spam"]:
-        media_signature=""
-        if msg.photo:
-            media_signature="photo:"+msg.photo[-1].file_unique_id
-        elif msg.animation:
-            media_signature="animation:"+msg.animation.file_unique_id
-        elif msg.video:
-            media_signature="video:"+msg.video.file_unique_id
-        elif msg.sticker:
-            media_signature="sticker:"+msg.sticker.file_unique_id
-        elif msg.voice:
-            media_signature="voice:"+msg.voice.file_unique_id
-        elif msg.audio:
-            media_signature="audio:"+msg.audio.file_unique_id
-        elif msg.document:
-            media_signature="document:"+msg.document.file_unique_id
-        spam_content=text or media_signature
-        now=time.time(); key=(chat.id,user.id); q=SPAM_WINDOW[key]
-        while q and now-q[0][0]>12: q.popleft()
-        normalized=" ".join(spam_content.casefold().split())
-        if normalized and any(item[1]==normalized for item in q): reason="ထပ်ခါထပ်ခါ စာပို့ခြင်း (Spam)"
-        if normalized:
-            q.append((now,normalized))
-    if reason:
-        try:
-            await msg.delete()
-            await context.bot.send_message(chat.id,f"🛡️ {user.mention_html()} — {reason}",parse_mode="HTML")
-        except Exception:
-            pass
+            words = [row["word"] for row in c.execute("SELECT word FROM blocked_words WHERE chat_id=?", (chat.id,)).fetchall()]
+        normalized = " ".join(body.casefold().split())
+        if any(word and word in normalized for word in words): reason = "ခွင့်မပြုထားသော စာသား ပါဝင်နေပါသည်"
+    if not reason and cfg["anti_spam"]:
+        now, key = time.time(), (chat.id, user.id)
+        flood = FLOOD_WINDOW[key]
+        while flood and now - flood[0] > 10: flood.popleft()
+        flood.append(now)
+        if len(flood) >= 7: reason = "စာတိုများ အလွန်မြန်ဆန်စွာ ပို့ခြင်း (Flood)"
+        if not reason:
+            media_signature = ""
+            for attr in ("photo", "animation", "video", "sticker", "voice", "audio", "document"):
+                item = getattr(msg, attr, None)
+                if item:
+                    obj = item[-1] if attr == "photo" else item
+                    media_signature = attr + ":" + obj.file_unique_id
+                    break
+            normalized = " ".join((body or media_signature).casefold().split())
+            recent = SPAM_WINDOW[key]
+            while recent and now - recent[0][0] > 20: recent.popleft()
+            if normalized and sum(1 for _, value in recent if value == normalized) >= 2:
+                reason = "တူညီသောစာ/Media ကို ထပ်ခါထပ်ခါ ပို့ခြင်း (Spam)"
+            if normalized: recent.append((now, normalized))
+    if not reason: return
+    try: await msg.delete()
+    except Exception: return
+    try:
+        await context.bot.send_message(chat.id, f"🛡️ {user.mention_html()} — {reason}။ စည်းကမ်းကို လိုက်နာပေးပါ။", parse_mode="HTML", disable_web_page_preview=True)
+    except Exception: pass
 
 async def monitor_member_change(update, context, owner_id):
     change=update.chat_member
