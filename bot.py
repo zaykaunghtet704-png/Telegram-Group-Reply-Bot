@@ -15,7 +15,7 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     ContextTypes, ChatMemberHandler, filters, ApplicationHandlerStop, TypeHandler,
 )
-from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision, add_blocked_word, list_blocked_words, delete_blocked_word
+from security import init_security_db, get_security, set_security, moderate_message, monitor_member_change, owner_raid_decision, add_blocked_word, list_blocked_words, delete_blocked_word, add_allowed_domain, list_allowed_domains, delete_allowed_domain
 from moderation import init_moderation_db, get_settings as get_moderation_settings, set_setting as set_moderation_setting, moderate_content, manual_warn, show_warnings, reset_warnings
 from group_features import init_group_features, set_rules_command, rules_command, lock_command, unlock_command
 from owner_control import (init_owner_control, owner_command, owner_callback,
@@ -1071,6 +1071,8 @@ def build_group_panel(chat_id):
          InlineKeyboardButton("🔗 Anti-link " + state(security["anti_link"]), callback_data="panel:antilink")],
         [InlineKeyboardButton("🚫 Anti-spam " + state(security["anti_spam"]), callback_data="panel:antispam"),
          InlineKeyboardButton("🔞 Adult Filter " + state(moderation["adult_filter"]), callback_data="panel:adult")],
+        [InlineKeyboardButton("🔗 Allowed Links", callback_data="panel:allowlinks"),
+         InlineKeyboardButton("⚠️ Warn Settings", callback_data="panel:warnsettings")],
         [InlineKeyboardButton("🎮 Group Games " + state(games_enabled(chat_id)), callback_data="panel:game")],
         [InlineKeyboardButton("⚙️ Settings", callback_data="panel:settings"),
          InlineKeyboardButton("❔ Help", callback_data="panel:help")],
@@ -1132,6 +1134,16 @@ async def panel_callback(update, context):
         set_moderation_setting(chat.id, "adult_filter", int(not current))
     elif action == "game":
         set_games_enabled(chat.id, not games_enabled(chat.id))
+    elif action == "allowlinks":
+        domains = list_allowed_domains(chat.id)
+        body = "\n".join("• " + d for d in domains) or "ခွင့်ပြုထားသော Domain မရှိသေးပါ။"
+        await q.edit_message_text("🔗 ALLOWED LINK DOMAINS\n━━━━━━━━━━━━━━━━━━━━\n" + body + "\n\n/allowlink example.com\n/disallowlink example.com\n/allowedlinks", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Group Panel", callback_data="panel:back")]]))
+        return
+    elif action == "warnsettings":
+        cfg = get_moderation_settings(chat.id)
+        body = f'Warn Limit: {cfg["warn_limit"]}\nAction: {cfg["warn_action"]}\nMute: {cfg["mute_seconds"]} seconds\nAdult Filter: {"ON" if cfg["adult_filter"] else "OFF"}'
+        await q.edit_message_text("⚠️ WARN & MODERATION SETTINGS\n━━━━━━━━━━━━━━━━━━━━\n" + body + "\n\n/setwarnlimit 3\n/setwarnaction mute|kick|ban\n/adultfilter on|off", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Group Panel", callback_data="panel:back")]]))
+        return
     elif action == "list":
         with db() as conn:
             rows = conn.execute("SELECT id,keyword,media_type FROM replies WHERE chat_id=? ORDER BY id DESC LIMIT 30", (chat.id,)).fetchall()
@@ -1672,6 +1684,29 @@ async def antispam_command(update, context):
     set_security(update.effective_chat.id,"anti_spam",value)
     await update.effective_message.reply_text("🚫 Anti-Spam ပြင်ဆင်ပြီးပါပြီ။")
 
+async def allow_link_command(update, context):
+    if not await require_admin(update, context): return
+    domain = update.effective_message.text.partition(' ')[2].strip()
+    if not domain:
+        await update.effective_message.reply_text('အသုံးပြုပုံ: /allowlink example.com')
+        return
+    ok = add_allowed_domain(update.effective_chat.id, domain)
+    await update.effective_message.reply_text('✅ ခွင့်ပြု Link Domain ထည့်ပြီးပါပြီ။' if ok else '❌ Domain မမှန်ပါ သို့မဟုတ် ရှိပြီးသားပါ။')
+
+async def allowed_links_command(update, context):
+    if not await require_admin(update, context): return
+    rows = list_allowed_domains(update.effective_chat.id)
+    await update.effective_message.reply_text('🔗 ခွင့်ပြုထားသော Link များ\n' + ('\n'.join('• ' + x for x in rows) or 'မရှိသေးပါ။'))
+
+async def disallow_link_command(update, context):
+    if not await require_admin(update, context): return
+    domain = context.args[0] if context.args else ''
+    if not domain:
+        await update.effective_message.reply_text('အသုံးပြုပုံ: /disallowlink example.com')
+        return
+    ok = delete_allowed_domain(update.effective_chat.id, domain)
+    await update.effective_message.reply_text('🗑️ ခွင့်ပြုစာရင်းမှ ဖယ်ရှားပြီးပါပြီ။' if ok else 'Domain မတွေ့ပါ။')
+
 async def set_raid_limit_command(update, context):
     if not await require_admin(update, context): return
     if not context.args or not context.args[0].isdigit() or not 2 <= int(context.args[0]) <= 20:
@@ -1983,6 +2018,9 @@ def main():
     app.add_handler(CommandHandler("security", security_command))
     app.add_handler(CommandHandler("antilink", antilink_command))
     app.add_handler(CommandHandler("antispam", antispam_command))
+    app.add_handler(CommandHandler("allowlink", allow_link_command))
+    app.add_handler(CommandHandler("allowedlinks", allowed_links_command))
+    app.add_handler(CommandHandler("disallowlink", disallow_link_command))
     app.add_handler(CommandHandler("setraidlimit", set_raid_limit_command))
     app.add_handler(CommandHandler("addfilterword", add_filter_word_command))
     app.add_handler(CommandHandler("listfilterwords", list_filter_words_command))
