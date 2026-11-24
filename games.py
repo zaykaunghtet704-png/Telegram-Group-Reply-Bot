@@ -534,8 +534,8 @@ async def topcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = ["👑 NEXUS RICHEST PLAYERS 👑", "━━━━━━━━━━━━━━━━━━"]
     medals = ["🥇", "🥈", "🥉", "🏅", "🎖️", "💠", "💎", "🔥", "⚡", "🌟"]
     for i, row in enumerate(rows, 1):
-        lines.append(f"{medals[i-1]} {row['display_name']}\\n   {row['coins']:,} GOLD COINS • ⭐ Lv.{_level(row['xp'])}")
-    caption = _hud_text("\\n".join(lines))
+        lines.append(f"{medals[i-1]} {row['display_name']}\n   {row['coins']:,} GOLD COINS • ⭐ Lv.{_level(row['xp'])}")
+    caption = _hud_text("\n".join(lines))
     coin = _gold_coin_image()
     photo = BytesIO()
     coin.save(photo, format="PNG")
