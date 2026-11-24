@@ -2052,7 +2052,7 @@ def main():
     app.add_handler(CommandHandler("addfilterword", add_filter_word_command))
     app.add_handler(CommandHandler("listfilterwords", list_filter_words_command))
     app.add_handler(CommandHandler("delfilterword", delete_filter_word_command))
-        app.add_handler(CommandHandler("learned", learned_list_command))
+    app.add_handler(CommandHandler("learned", learned_list_command))
     app.add_handler(CommandHandler("forgetlearned", forget_learned_command))
     app.add_handler(CommandHandler("setlearnthreshold", set_learn_threshold))
     app.add_handler(CommandHandler("replysettings", reply_settings))
