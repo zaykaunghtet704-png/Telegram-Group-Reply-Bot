@@ -1583,13 +1583,10 @@ async def handle_text(update, context):
     if replied_to_bot and not smart_reply:
         smart_reply = "ဟုတ်ကဲ့ရှင် 💗 မြအေး နားထောင်နေပါတယ်။ ဆက်ပြောပါနော်။"
     if smart_reply:
-        last_chat = SMART_CHAT_LAST_REPLY[chat.id]
-        last_user = SMART_USER_LAST_REPLY[(chat.id, user.id)]
-        if now - last_chat >= 45 and now - last_user >= 90:
-            await msg.reply_text(smart_reply, reply_to_message_id=msg.message_id)
-            SMART_CHAT_LAST_REPLY[chat.id] = now
-            SMART_USER_LAST_REPLY[(chat.id, user.id)] = now
-            return
+        await msg.reply_text(smart_reply, reply_to_message_id=msg.message_id)
+        SMART_CHAT_LAST_REPLY[chat.id] = now
+        SMART_USER_LAST_REPLY[(chat.id, user.id)] = now
+        return
 
     limit = int(s.get("flood_limit", 0))
     if s["enabled"] and limit:
@@ -1604,23 +1601,16 @@ async def handle_text(update, context):
         try:
             learned = find_learned_reply(chat.id, msg.text, learning["threshold"])
             if learned and s["enabled"] and random.randint(1, 100) <= s["chance"]:
+                await msg.reply_text(learned["response"], reply_to_message_id=msg.message_id)
                 with db() as conn:
-                    last = conn.execute("SELECT last_reply FROM usage WHERE chat_id=? AND user_id=?", (chat.id, user.id)).fetchone()
-                cooldown_ok = not last or now - last["last_reply"] >= s["cooldown"]
-                group_cd = int(s.get("group_cooldown", 0))
-                group_ok = not group_cd or now - GROUP_LAST_REPLY[chat.id] >= group_cd
-                if cooldown_ok and group_ok:
-                    await msg.reply_text(learned["response"], reply_to_message_id=msg.message_id)
-                    GROUP_LAST_REPLY[chat.id] = now
-                    with db() as conn:
-                        conn.execute("UPDATE learned_pairs SET hits=hits+1 WHERE id=?", (learned["id"],))
-                        conn.execute(
-                            "INSERT INTO usage(chat_id,user_id,last_reply) VALUES(?,?,?) "
-                            "ON CONFLICT(chat_id,user_id) DO UPDATE SET last_reply=excluded.last_reply",
-                            (chat.id, user.id, now),
-                        )
-                    clear_pending(chat.id)
-                    return
+                    conn.execute("UPDATE learned_pairs SET hits=hits+1 WHERE id=?", (learned["id"],))
+                    conn.execute(
+                        "INSERT INTO usage(chat_id,user_id,last_reply) VALUES(?,?,?) "
+                        "ON CONFLICT(chat_id,user_id) DO UPDATE SET last_reply=excluded.last_reply",
+                        (chat.id, user.id, now),
+                    )
+                clear_pending(chat.id)
+                return
             replied_user = msg.reply_to_message.from_user if msg.reply_to_message else None
             record_conversation(
                 chat.id, user.id, msg.text,
@@ -1633,9 +1623,6 @@ async def handle_text(update, context):
     with db() as conn:
         # Check every member independently; keyword replies have no per-user cooldown.
         rows = conn.execute("SELECT * FROM replies WHERE chat_id=? AND enabled=1 ORDER BY priority DESC,id DESC", (chat.id,)).fetchall()
-    group_cd = int(s.get("group_cooldown", 0))
-    if group_cd and now - GROUP_LAST_REPLY[chat.id] < group_cd:
-        return
     incoming = " ".join(msg.text.casefold().split())
     matches = []
     default_row = None
