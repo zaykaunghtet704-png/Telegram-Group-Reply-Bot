@@ -1056,29 +1056,49 @@ async def stats(update, context):
     await update.effective_message.reply_text(f"📊 Group Statistics\nReply စည်းမျဉ်း: {count} ခု\nပို့ပြီးအကြိမ်: {hits}\n\n🏆 လူသုံးများသော Keyword\n{top_text}")
 
 
-async def panel(update, context):
-    if not await require_admin(update, context):
-        return
+def build_group_panel(chat_id):
+    settings = get_settings(chat_id)
+    security = get_security(chat_id)
+    moderation = get_moderation_settings(chat_id)
+    state = lambda value: "🟢 ON" if value else "🔴 OFF"
     keyboard = [
         [InlineKeyboardButton("📚 Reply စာရင်း", callback_data="panel:list"),
          InlineKeyboardButton("📊 Stats", callback_data="panel:stats")],
-        [InlineKeyboardButton("✅ Auto ON", callback_data="panel:on"),
-         InlineKeyboardButton("⛔ Auto OFF", callback_data="panel:off")],
-        [InlineKeyboardButton("👋 Welcome ON/OFF", callback_data="panel:welcome"),
-         InlineKeyboardButton("🚪 Goodbye ON/OFF", callback_data="panel:goodbye")],
+        [InlineKeyboardButton("💬 Auto Reply " + state(settings["enabled"]), callback_data="panel:on" if not settings["enabled"] else "panel:off")],
+        [InlineKeyboardButton("👋 Welcome " + state(settings["welcome_enabled"]), callback_data="panel:welcome"),
+         InlineKeyboardButton("🚪 Goodbye " + state(settings["goodbye_enabled"]), callback_data="panel:goodbye")],
+        [InlineKeyboardButton("🛡️ Security " + state(security["enabled"]), callback_data="panel:security"),
+         InlineKeyboardButton("🔗 Anti-link " + state(security["anti_link"]), callback_data="panel:antilink")],
+        [InlineKeyboardButton("🚫 Anti-spam " + state(security["anti_spam"]), callback_data="panel:antispam"),
+         InlineKeyboardButton("🔞 Adult Filter " + state(moderation["adult_filter"]), callback_data="panel:adult")],
+        [InlineKeyboardButton("🎮 Group Games " + state(games_enabled(chat_id)), callback_data="panel:game")],
         [InlineKeyboardButton("⚙️ Settings", callback_data="panel:settings"),
          InlineKeyboardButton("❔ Help", callback_data="panel:help")],
     ]
-    await update.effective_message.reply_text(
-        "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 — 𝗔𝗗𝗠𝗜𝗡 𝗖𝗢𝗡𝗧𝗥𝗢𝗟\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "အောက်က ခလုတ်များကို ရွေးချယ်ပါ။",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+    text = (
+        "💎 𝗣𝗥𝗢 𝗥𝗘𝗣𝗟𝗬 — 𝗚𝗥𝗢𝗨𝗣 𝗖𝗢𝗡𝗧𝗥𝗢𝗟\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "👥 " + (str(chat_id)) + "\n"
+        "အောက်ပါခလုတ်များဖြင့် Group စနစ်ကို ထိန်းချုပ်ပါ။\n\n"
+        "🟢 ON = ဖွင့်ထားသည်   🔴 OFF = ပိတ်ထားသည်\n"
+        "မှတ်ချက် — Anti-link / Anti-spam အလုပ်လုပ်ရန် Security ကို ON ထားပါ။"
     )
+    return text, InlineKeyboardMarkup(keyboard)
+
+
+async def panel(update, context):
+    if not await require_admin(update, context):
+        return
+    text, keyboard = build_group_panel(update.effective_chat.id)
+    await update.effective_message.reply_text(text, reply_markup=keyboard)
 
 
 async def panel_callback(update, context):
     q = update.callback_query
+    if not q or not q.message:
+        if q:
+            await q.answer("ဒီ Panel ကို Group ထဲမှာ ပြန်ဖွင့်ပါ။", show_alert=True)
+        return
     chat = q.message.chat
     user = q.from_user
     if OWNER_ID and user.id == OWNER_ID:
@@ -1087,45 +1107,65 @@ async def panel_callback(update, context):
         try:
             member = await context.bot.get_chat_member(chat.id, user.id)
             allowed = member.status in ("administrator", "creator")
-        except Exception:
+        except TelegramError:
             allowed = False
     else:
         allowed = False
     if not allowed:
         await q.answer("Group Admin များသာ အသုံးပြုနိုင်ပါတယ်။", show_alert=True)
         return
-    await q.answer()
+
     action = q.data.split(":", 1)[1]
-    if action == "on":
-        set_setting(chat.id, "enabled", 1)
-        await q.edit_message_text("✅ Auto Reply ဖွင့်ပြီးပါပြီ။")
-    elif action == "off":
-        set_setting(chat.id, "enabled", 0)
-        await q.edit_message_text("⛔ Auto Reply ပိတ်ပြီးပါပြီ။")
+    await q.answer()
+    if action in ("on", "off"):
+        set_setting(chat.id, "enabled", int(action == "on"))
+    elif action in ("welcome", "goodbye"):
+        key = "welcome_enabled" if action == "welcome" else "goodbye_enabled"
+        current = get_settings(chat.id)[key]
+        set_setting(chat.id, key, int(not current))
+    elif action in ("security", "antilink", "antispam"):
+        key = {"security": "enabled", "antilink": "anti_link", "antispam": "anti_spam"}[action]
+        current = get_security(chat.id)[key]
+        set_security(chat.id, key, int(not current))
+    elif action == "adult":
+        current = get_moderation_settings(chat.id)["adult_filter"]
+        set_moderation_setting(chat.id, "adult_filter", int(not current))
+    elif action == "game":
+        set_games_enabled(chat.id, not games_enabled(chat.id))
     elif action == "list":
         with db() as conn:
             rows = conn.execute("SELECT id,keyword,media_type FROM replies WHERE chat_id=? ORDER BY id DESC LIMIT 30", (chat.id,)).fetchall()
         body = "\n".join(f'{r["id"]}. {r["keyword"]} [{r["media_type"]}]' for r in rows) or "Reply မရှိသေးပါ။"
-        await q.edit_message_text("📚 Reply List\n" + body)
+        await q.edit_message_text("📚 𝗚𝗥𝗢𝗨𝗣 𝗥𝗘𝗣𝗟𝗬 𝗟𝗜𝗦𝗧\n━━━━━━━━━━━━━━━━━━━━\n" + body)
+        return
     elif action == "stats":
         with db() as conn:
             n = conn.execute("SELECT COUNT(*) n FROM replies WHERE chat_id=?", (chat.id,)).fetchone()["n"]
-        await q.edit_message_text("📊 Reply အရေအတွက်: " + str(n))
-    elif action == "welcome":
-        s = get_settings(chat.id)
-        value = 0 if s["welcome_enabled"] else 1
-        set_setting(chat.id, "welcome_enabled", value)
-        await q.edit_message_text("👋 Welcome: " + ("ON" if value else "OFF"))
-    elif action == "goodbye":
-        s = get_settings(chat.id)
-        value = 0 if s["goodbye_enabled"] else 1
-        set_setting(chat.id, "goodbye_enabled", value)
-        await q.edit_message_text("🚪 Goodbye: " + ("ON" if value else "OFF"))
+            hits = conn.execute("SELECT COALESCE(SUM(hits),0) n FROM replies WHERE chat_id=?", (chat.id,)).fetchone()["n"]
+        await q.edit_message_text(f"📊 𝗚𝗥𝗢𝗨𝗣 𝗦𝗧𝗔𝗧𝗦\n━━━━━━━━━━━━━━━━━━━━\n📚 Reply Rules: {n}\n⚡ Total Replies: {hits}")
+        return
     elif action == "settings":
         s = get_settings(chat.id)
-        await q.edit_message_text(f'Auto: {s["enabled"]}\nChance: {s["chance"]}%\nUser cooldown: {s["cooldown"]} sec\nGroup cooldown: {s["group_cooldown"]} sec\nFlood limit: {s["flood_limit"]}\nMatch: {s["match_mode"]}\nLanguage: {s["language"]}\nWelcome: {s["welcome_enabled"]}\nGoodbye: {s["goodbye_enabled"]}')
-    else:
-        await q.edit_message_text("အသုံးပြုနည်းအတွက် /help ကိုနှိပ်ပါ။")
+        sec = get_security(chat.id)
+        mod = get_moderation_settings(chat.id)
+        await q.edit_message_text(
+            "⚙️ 𝗚𝗥𝗢𝗨𝗣 𝗦𝗘𝗧𝗧𝗜𝗡𝗚𝗦\n━━━━━━━━━━━━━━━━━━━━\n"
+            f'Auto Reply: {s["enabled"]}\nChance: {s["chance"]}%\n'
+            f'User Cooldown: {s["cooldown"]}s\nGroup Cooldown: {s["group_cooldown"]}s\n'
+            f'Flood Limit: {s["flood_limit"]}\nMatch: {s["match_mode"]}\nLanguage: {s["language"]}\n'
+            f'Security: {sec["enabled"]} | Anti-link: {sec["anti_link"]} | Anti-spam: {sec["anti_spam"]}\n'
+            f'Adult Filter: {mod["adult_filter"]}\nWelcome: {s["welcome_enabled"]} | Goodbye: {s["goodbye_enabled"]}',
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Group Panel", callback_data="panel:back")]])
+        )
+        return
+    elif action == "help":
+        await q.edit_message_text("❔ Group Admin Help\n/panel — Control Panel\n/setrules — Set rules\n/rules — View rules\n/lock /unlock — Lock controls\n/warn — Warn a replied member\n/reports — View reports")
+        return
+    elif action == "back":
+        pass
+
+    text, keyboard = build_group_panel(chat.id)
+    await q.edit_message_text(text, reply_markup=keyboard)
 
 
 async def import_sqlite_command(update, context):
