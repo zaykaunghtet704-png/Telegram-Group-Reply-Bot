@@ -55,7 +55,8 @@ async def start_music():
             chat_id = update.chat_id
             try:
                 async with _locks[chat_id]:
-                    _current.pop(chat_id, None)
+                    finished = _current.pop(chat_id, None)
+                    _cleanup_track(finished)
                     track = await _play_next(chat_id)
                 if track:
                     await _client.send_message(chat_id, f"🎶 နောက်သီချင်း: {track['title']}")
@@ -100,6 +101,7 @@ async def _search_download(query):
         "no_warnings": True,
         "default_search": "ytsearch1",
         "max_filesize": 80 * 1024 * 1024,
+        "match_filter": yt_dlp.utils.match_filter_func("duration <= 1800"),
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "opus",
@@ -130,6 +132,11 @@ async def _search_download(query):
             }
 
     return await asyncio.to_thread(work)
+
+
+def _cleanup_track(track):
+    if track and track.get("folder"):
+        shutil.rmtree(track["folder"], ignore_errors=True)
 
 
 async def _play_next(chat_id):
@@ -215,7 +222,8 @@ async def skip_command(update, context):
     try:
         async with _locks[chat_id]:
             await _calls.leave_call(chat_id)
-            _current.pop(chat_id, None)
+            old = _current.pop(chat_id, None)
+            _cleanup_track(old)
             track = await _play_next(chat_id)
         await update.effective_message.reply_text(
             f"⏭️ နောက်သီချင်း: {track['title']}" if track else "Queue ကုန်သွားပါပြီ။"
@@ -229,7 +237,10 @@ async def stop_command(update, context):
     try:
         if _calls:
             await _calls.leave_call(chat_id)
-        _current.pop(chat_id, None)
+        old = _current.pop(chat_id, None)
+        _cleanup_track(old)
+        for queued in list(_queues[chat_id]):
+            _cleanup_track(queued)
         _queues[chat_id].clear()
         await update.effective_message.reply_text("⏹️ Music ရပ်ပြီး Queue ရှင်းလိုက်ပါပြီ။")
     except Exception as exc:
