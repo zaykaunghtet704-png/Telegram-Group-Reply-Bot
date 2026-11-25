@@ -3,3 +3,7 @@ psycopg[binary,pool]>=3.2,<4
 flask>=3.0,<4
 gunicorn>=22.0,<24.0
 Pillow>=10.0,<13.0
+pyrogram==2.0.106
+tgcrypto>=1.2.5
+py-tgcalls==2.2.11
+yt-dlp>=2025.10.22
