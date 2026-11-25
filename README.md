@@ -195,3 +195,39 @@ Placeholders: `{name}` (member name), `{username}` (Telegram username), `{id}` (
 - RPG statistics, mission progress, inventory and loadout are stored in PostgreSQL and included in database backups.
 - RPG XP is a separate lifetime progression track and starts accumulating when the RPG update is deployed; existing game XP and ranks remain unchanged.
 - Current cosmetic shop items are visual profile decorations only; they do not change game odds or payouts.
+
+## Voice Chat Music Player
+
+An optional Music Assistant user account can stream YouTube audio into Telegram group voice chats.
+The bot itself remains a Bot API account; the assistant uses Pyrogram + PyTgCalls.
+
+Render environment variables (keep all values private):
+- `MUSIC_API_ID` — numeric API ID from https://my.telegram.org
+- `MUSIC_API_HASH` — API hash from https://my.telegram.org
+- `MUSIC_SESSION_STRING` — session string generated for the separate Music Assistant account
+
+Setup:
+1. Create a separate Telegram account for Music Assistant and obtain its API ID / API hash from my.telegram.org.
+2. Generate its Pyrogram session string locally. Never paste the session string into GitHub, group chats, or this bot conversation.
+3. Add the Music Assistant account to each group where music is needed.
+4. Start a group Voice Chat manually. The assistant account must be able to join it.
+5. Add the three values above to the bot's Render Environment and redeploy.
+
+Commands:
+- `/play song name` — search YouTube and play audio, or add it to the queue
+- `/pause`, `/resume`, `/skip`, `/stop`
+- `/queue`, `/song`, `/volume 1-200`
+
+The Music Assistant is optional: if its credentials are not configured, the existing bot continues to start normally and music commands report that setup is required. Tracks are limited to 30 minutes and downloaded audio is removed after playback. YouTube availability and copyright restrictions may affect individual tracks.
+
+## Waifu Card Drop
+
+Waifu drops use the existing PostgreSQL database and are independent of the Music Assistant.
+- Bot Owner adds a card by replying to a photo with `/waifuadd Name | Rarity | ATK | DEF | HP`.
+- Group admins can manually drop a card with `/waifudrop`.
+- Automatic drops are enabled by default and occur every 85 group messages.
+- Group admins can use `/waifuauto on|off` and `/waifuinterval 85` (allowed interval: 10-10000).
+- The first member to press Claim receives the card; `/harem` shows their collection.
+
+Cards are shared across groups, but drops and auto-drop counters are group-specific. This initial drop module provides card collection and first-claim mechanics; it does not yet add a card market, trading, or coin purchases.
+
