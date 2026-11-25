@@ -208,7 +208,7 @@ Render environment variables (keep all values private):
 
 Setup:
 1. Create a separate Telegram account for Music Assistant and obtain its API ID / API hash from my.telegram.org.
-2. Generate its Pyrogram session string locally. Never paste the session string into GitHub, group chats, or this bot conversation.
+2. On a trusted local device (for example Termux), install the project requirements and run `python generate_music_session.py`. Enter the API ID, API hash, assistant phone number, Telegram login code, and 2FA password if requested. Copy the generated session string directly into Render. Never paste it into GitHub, group chats, or this bot conversation.
 3. Add the Music Assistant account to each group where music is needed.
 4. Start a group Voice Chat manually. The assistant account must be able to join it.
 5. Add the three values above to the bot's Render Environment and redeploy.
