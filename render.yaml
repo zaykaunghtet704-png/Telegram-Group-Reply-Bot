@@ -11,6 +11,12 @@ services:
         value: "7974865879"
       - key: DATABASE_URL
         sync: false
+      - key: MUSIC_API_ID
+        sync: false
+      - key: MUSIC_API_HASH
+        sync: false
+      - key: MUSIC_SESSION_STRING
+        sync: false
       - key: GAME_WEBAPP_URL
         fromService:
           type: web
