@@ -1831,6 +1831,7 @@ async def post_init(app):
         ("queue", "Show music queue"),
         ("song", "Show current song"),
         ("volume", "Change music volume"),
+        ("waifuadd", "Owner: add a waifu card by replying to a photo"),
         ("waifudrop", "Admin: drop a waifu card"),
         ("waifuauto", "Admin: enable or disable automatic drops"),
         ("waifuinterval", "Admin: set message count between drops"),
