@@ -42,6 +42,7 @@ from games import (
     quiz, answer, fish, hunt, mines, mine_callback, pick_mine, cashout_mines, spin, duel, duel_accept, duel_decline,
     addcoins, takecoins,
 )
+from music import start_music, stop_music, music_handlers
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
@@ -1767,7 +1768,11 @@ async def owner_security_callback(update, context):
         await update.callback_query.answer()
 
 async def post_shutdown(app):
-    """Return PostgreSQL pool resources cleanly when the service shuts down."""
+    """Stop optional music services and release PostgreSQL resources."""
+    try:
+        await stop_music()
+    except Exception:
+        logger.exception("Could not stop Music Assistant")
     try:
         from database import close_pool
         close_pool()
@@ -1776,6 +1781,9 @@ async def post_shutdown(app):
 
 
 async def post_init(app):
+    # The separate user account joins group voice chats when credentials are configured.
+    await start_music()
+
     # Profile changes are optional: Telegram may rate-limit these API calls.
     # Set SYNC_BOT_PROFILE=1 only when an intentional profile update is needed.
     if os.getenv("SYNC_BOT_PROFILE", "0").strip().lower() in {"1", "true", "yes", "on"}:
@@ -1814,6 +1822,14 @@ async def post_init(app):
         ("ads", "Manage private ad messages"),
         ("help", "Help and commands"),
         ("games", "Group games and coin commands"),
+        ("play", "Play a YouTube song in group voice chat"),
+        ("pause", "Pause music"),
+        ("resume", "Resume music"),
+        ("skip", "Skip current song"),
+        ("stop", "Stop music and clear queue"),
+        ("queue", "Show music queue"),
+        ("song", "Show current song"),
+        ("volume", "Change music volume"),
         ("ultimate", "Open the Ultimate RPG world"),
         ("dungeon", "Fight monsters in the RPG dungeon"),
         ("summon", "Summon a collectible RPG hero"),
@@ -1962,6 +1978,8 @@ def main():
     app.add_handler(MessageHandler(filters.ALL, track_chats), group=-10)
     app.add_handler(MessageHandler(filters.ALL, check_afk_mention), group=-9)
     app.add_handler(CommandHandler("help", help_command))
+    for music_handler in music_handlers():
+        app.add_handler(music_handler)
     app.add_handler(CommandHandler("games", game_help))
     app.add_handler(CommandHandler("rpg", rpg_profile))
     app.add_handler(CommandHandler("missions", missions_command))
