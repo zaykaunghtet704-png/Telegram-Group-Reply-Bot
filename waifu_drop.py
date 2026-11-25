@@ -281,7 +281,7 @@ async def waifu_claim_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     with db() as conn:
         drop = conn.execute(
-            "SELECT card_id,claimed_by FROM waifu_active_drops WHERE chat_id=?",
+            "SELECT card_id,claimed_by FROM waifu_active_drops WHERE chat_id=? FOR UPDATE",
             (chat_id,),
         ).fetchone()
         if not drop or int(drop["card_id"]) != card_id:
@@ -322,5 +322,8 @@ def waifu_handlers():
         CommandHandler("waifuinterval", waifu_interval_command),
         CommandHandler("harem", waifu_harem_command),
         CallbackQueryHandler(waifu_claim_callback, pattern=r"^waifu:claim:"),
-        MessageHandler(filters.ALL, waifu_track_message, block=False),
     ]
+
+
+def waifu_tracker_handler():
+    return MessageHandler(filters.ALL, waifu_track_message, block=False)
