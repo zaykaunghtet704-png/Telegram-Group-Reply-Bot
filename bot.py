@@ -43,6 +43,7 @@ from games import (
     addcoins, takecoins,
 )
 from music import start_music, stop_music, music_handlers
+from waifu_drop import init_waifu, waifu_handlers, waifu_tracker_handler
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OWNER_ID = int(os.getenv("OWNER_ID", "7974865879") or 7974865879)
@@ -1830,6 +1831,10 @@ async def post_init(app):
         ("queue", "Show music queue"),
         ("song", "Show current song"),
         ("volume", "Change music volume"),
+        ("waifudrop", "Admin: drop a waifu card"),
+        ("waifuauto", "Admin: enable or disable automatic drops"),
+        ("waifuinterval", "Admin: set message count between drops"),
+        ("harem", "View your collected waifu cards"),
         ("ultimate", "Open the Ultimate RPG world"),
         ("dungeon", "Fight monsters in the RPG dungeon"),
         ("summon", "Summon a collectible RPG hero"),
@@ -1945,6 +1950,7 @@ def main():
     init_rpg_expansion()
     init_rpg_ultimate()
     init_coin_codes()
+    init_waifu()
     migration = migrate_sqlite_once()
     logger.info("SQLite migration result: %s", migration)
     app = Application.builder().token(BOT_TOKEN).concurrent_updates(12).post_init(post_init).post_shutdown(post_shutdown).build()
@@ -1980,6 +1986,9 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     for music_handler in music_handlers():
         app.add_handler(music_handler)
+    for waifu_handler in waifu_handlers():
+        app.add_handler(waifu_handler)
+    app.add_handler(waifu_tracker_handler(), group=2)
     app.add_handler(CommandHandler("games", game_help))
     app.add_handler(CommandHandler("rpg", rpg_profile))
     app.add_handler(CommandHandler("missions", missions_command))
