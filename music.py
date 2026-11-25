@@ -6,6 +6,7 @@ variables and must never be committed to the repository.
 import asyncio
 import logging
 import os
+import shutil
 import tempfile
 from collections import defaultdict, deque
 from pathlib import Path
@@ -131,7 +132,11 @@ async def _search_download(query):
                 "folder": folder,
             }
 
-    return await asyncio.to_thread(work)
+    try:
+        return await asyncio.to_thread(work)
+    except Exception:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
 
 
 def _cleanup_track(track):
@@ -171,6 +176,7 @@ async def play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("အသုံးပြုပုံ: /play သီချင်းအမည်")
         return
     status = await msg.reply_text("🔎 YouTube မှာ သီချင်းရှာနေပါတယ်...")
+    track = None
     try:
         track = await _search_download(query)
         async with _locks[chat.id]:
@@ -188,6 +194,7 @@ async def play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 _temp_files[chat.id].append(track["folder"])
                 await status.edit_text(f"▶️ ဖွင့်နေပါပြီ\n🎵 {track['title']}")
     except Exception as exc:
+        _cleanup_track(track)
         log.exception("Music play failed")
         await status.edit_text(f"❌ သီချင်းဖွင့်မရပါ။ Voice Chat ဖွင့်ထားပြီး Assistant ကို Group ထဲထည့်ထားပါ။\n{str(exc)[:250]}")
 
