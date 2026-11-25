@@ -49,6 +49,18 @@ async def start_music():
         )
         await _client.start()
         _calls = PyTgCalls(_client)
+        from pytgcalls import filters as call_filters
+        @_calls.on_update(call_filters.stream_end())
+        async def _stream_finished(_, update):
+            chat_id = update.chat_id
+            try:
+                async with _locks[chat_id]:
+                    _current.pop(chat_id, None)
+                    track = await _play_next(chat_id)
+                if track:
+                    await _client.send_message(chat_id, f"🎶 နောက်သီချင်း: {track['title']}")
+            except Exception:
+                log.exception("Could not advance music queue for %s", chat_id)
         await _calls.start()
         log.info("Music Assistant connected")
         return True
@@ -163,7 +175,6 @@ async def play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🎵 {track['title']}\n📌 နေရာ: {position}"
                 )
             else:
-                await _play_next(chat.id) if False else asyncio.sleep(0)
                 from pytgcalls.types import MediaStream
                 await _calls.play(chat.id, MediaStream(track["path"]))
                 _current[chat.id] = track
@@ -238,6 +249,24 @@ async def queue_command(update, context):
     await update.effective_message.reply_text("\n".join(lines))
 
 
+async def volume_command(update, context):
+    if not _calls:
+        await update.effective_message.reply_text("Music Assistant မချိတ်ဆက်ရသေးပါ။")
+        return
+    if not context.args or not context.args[0].isdigit():
+        await update.effective_message.reply_text("အသုံးပြုပုံ: /volume 1-200")
+        return
+    volume = int(context.args[0])
+    if not 1 <= volume <= 200:
+        await update.effective_message.reply_text("Volume ကို 1 မှ 200 အတွင်း သတ်မှတ်ပါ။")
+        return
+    try:
+        await _calls.change_volume_call(update.effective_chat.id, volume)
+        await update.effective_message.reply_text(f"🔊 Volume: {volume}%")
+    except Exception as exc:
+        await update.effective_message.reply_text(f"Volume ပြောင်းမရပါ: {str(exc)[:180]}")
+
+
 async def song_command(update, context):
     track = _current.get(update.effective_chat.id)
     if not track:
@@ -259,4 +288,5 @@ def music_handlers():
         CommandHandler("stop", stop_command),
         CommandHandler("queue", queue_command),
         CommandHandler("song", song_command),
+        CommandHandler("volume", volume_command),
     ]
